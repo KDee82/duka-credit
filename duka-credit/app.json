@@ -1,0 +1,38 @@
+{
+  "expo": {
+    "name": "Duka Credit",
+    "slug": "duka-credit",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "light",
+    "splash": {
+      "image": "./assets/splash.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#1E5A9E"
+    },
+    "ios": {
+      "supportsTablet": false,
+      "bundleIdentifier": "com.btzen.dukacredit"
+    },
+    "android": {
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#1E5A9E"
+      },
+      "package": "com.btzen.dukacredit"
+    },
+    "web": {
+      "favicon": "./assets/favicon.png"
+    },
+    "plugins": [
+      [
+        "expo-sqlite",
+        {
+          "enableFTS": true,
+          "useSQLCipher": false
+        }
+      ]
+    ]
+  }
+}
