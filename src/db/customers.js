@@ -60,6 +60,23 @@ export function updateCustomer(id, fields) {
   return getCustomerById(id);
 }
 
+export function searchCustomers(query) {
+  const db = getDB();
+  const q = `%${query}%`;
+  return db.getAllSync(`
+    SELECT
+      c.*,
+      COALESCE(SUM(CASE WHEN t.type = 'credit' AND t.is_voided = 0 THEN t.amount ELSE 0 END), 0)
+      - COALESCE(SUM(CASE WHEN t.type = 'payment' AND t.is_voided = 0 THEN t.amount ELSE 0 END), 0)
+      AS balance
+    FROM customers c
+    LEFT JOIN transactions t ON t.customer_id = c.id
+    WHERE c.status = 'active' AND (c.name LIKE ? OR c.phone LIKE ?)
+    GROUP BY c.id
+    ORDER BY balance DESC, c.name ASC
+  `, [q, q]);
+}
+
 export function getCustomerBalance(id) {
   const db = getDB();
   const result = db.getFirstSync(`

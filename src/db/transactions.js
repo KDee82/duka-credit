@@ -32,12 +32,30 @@ export function getTodaySummary() {
   const db = getDB();
   const result = db.getFirstSync(`
     SELECT
-      COALESCE(SUM(CASE WHEN type = 'credit' AND is_voided = 0 THEN amount ELSE 0 END), 0) AS total_credit,
-      COALESCE(SUM(CASE WHEN type = 'payment' AND is_voided = 0 THEN amount ELSE 0 END), 0) AS total_payment
+      COALESCE(SUM(CASE WHEN type = 'credit' AND is_voided = 0 THEN amount ELSE 0 END), 0) AS credits,
+      COALESCE(SUM(CASE WHEN type = 'payment' AND is_voided = 0 THEN amount ELSE 0 END), 0) AS payments
     FROM transactions
     WHERE date(created_at) = date('now')
   `);
-  return result || { total_credit: 0, total_payment: 0 };
+  return result || { credits: 0, payments: 0 };
+}
+
+export function getTopDebtors(limit = 5) {
+  const db = getDB();
+  return db.getAllSync(`
+    SELECT
+      c.*,
+      COALESCE(SUM(CASE WHEN t.type = 'credit' AND t.is_voided = 0 THEN t.amount ELSE 0 END), 0)
+      - COALESCE(SUM(CASE WHEN t.type = 'payment' AND t.is_voided = 0 THEN t.amount ELSE 0 END), 0)
+      AS balance
+    FROM customers c
+    LEFT JOIN transactions t ON t.customer_id = c.id
+    WHERE c.status = 'active'
+    GROUP BY c.id
+    HAVING balance > 0
+    ORDER BY balance DESC
+    LIMIT ?
+  `, [limit]);
 }
 
 export function getTotalOutstanding() {
