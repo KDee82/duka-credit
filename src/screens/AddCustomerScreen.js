@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import {
-  View, Text, StyleSheet, TextInput, TouchableOpacity,
+  View, Text, StyleSheet, TextInput, TouchableOpacity, Pressable,
   ScrollView, Alert, KeyboardAvoidingView, Platform,
 } from 'react-native';
 import { COLORS, FONT_SIZES } from '../utils/constants';
@@ -71,9 +71,13 @@ export default function AddCustomerScreen({ navigation }) {
           <Text style={styles.hint}>Set to 0 for no credit limit</Text>
         </View>
 
-        <TouchableOpacity style={styles.saveBtn} onPress={handleSave}>
+        <Pressable
+          style={styles.saveBtn}
+          onPress={handleSave}
+          android_ripple={{ color: 'rgba(255,255,255,0.3)', borderless: false }}
+        >
           <Text style={styles.saveBtnText}>Add Customer</Text>
-        </TouchableOpacity>
+        </Pressable>
       </ScrollView>
     </KeyboardAvoidingView>
   );
@@ -85,6 +89,6 @@ const styles = StyleSheet.create({
   label: { fontSize: FONT_SIZES.sm, fontWeight: '600', color: COLORS.textLight, marginBottom: 8, textTransform: 'uppercase', letterSpacing: 0.3 },
   input: { backgroundColor: COLORS.white, borderRadius: 10, padding: 14, fontSize: FONT_SIZES.md, color: COLORS.text, elevation: 1 },
   hint: { fontSize: FONT_SIZES.xs, color: COLORS.textLight, marginTop: 4, marginLeft: 4 },
-  saveBtn: { margin: 16, marginTop: 32, padding: 18, borderRadius: 14, backgroundColor: COLORS.primary, alignItems: 'center', elevation: 2 },
+  saveBtn: { margin: 16, marginTop: 32, paddingVertical: 18, paddingHorizontal: 16, borderRadius: 14, backgroundColor: COLORS.primary, alignItems: 'center', elevation: 2, minHeight: 56 },
   saveBtnText: { color: COLORS.white, fontSize: FONT_SIZES.lg, fontWeight: '700' },
 });
