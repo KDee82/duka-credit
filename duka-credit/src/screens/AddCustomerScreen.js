@@ -1,11 +1,14 @@
 import React, { useState } from 'react';
 import {
-  View, Text, StyleSheet, TextInput, TouchableOpacity,
+  View, Text, StyleSheet, TextInput, Pressable,
   ScrollView, Alert, KeyboardAvoidingView, Platform, StatusBar,
 } from 'react-native';
 import { addCustomer } from '../db/customers';
-import { COLORS } from '../utils/constants';
+import { COLORS } from '../theme/colors';
+import { shadows } from '../theme/shadows';
 import { isValidPhone } from '../utils/formatters';
+import DukaAvatar from '../components/DukaAvatar';
+import DukaButton from '../components/DukaButton';
 
 const AddCustomerScreen = ({ navigation }) => {
   const [name, setName] = useState('');
@@ -15,14 +18,13 @@ const AddCustomerScreen = ({ navigation }) => {
 
   const handleSave = () => {
     if (!name.trim()) {
-      Alert.alert('Name Required', 'Please enter the customer\'s name.');
+      Alert.alert('Name Required', "Please enter the customer's name.");
       return;
     }
     if (phone && !isValidPhone(phone)) {
       Alert.alert('Invalid Phone', 'Please enter a valid phone number (e.g. 0712 345 678).');
       return;
     }
-
     setSaving(true);
     try {
       const limit = creditLimit ? parseFloat(creditLimit) : 0;
@@ -39,10 +41,19 @@ const AddCustomerScreen = ({ navigation }) => {
       style={styles.container}
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
     >
-      <StatusBar backgroundColor={COLORS.primary} barStyle="light-content" />
+      <StatusBar backgroundColor={COLORS.navy} barStyle="light-content" />
 
       <ScrollView contentContainerStyle={styles.scroll}>
 
+        {/* Avatar preview */}
+        <View style={styles.avatarPreview}>
+          <DukaAvatar name={name || '?'} size="lg" />
+          <Text style={styles.avatarHint}>
+            {name.trim() ? name.trim() : 'Customer preview'}
+          </Text>
+        </View>
+
+        {/* Form card */}
         <View style={styles.card}>
           <Text style={styles.cardTitle}>Customer Details</Text>
 
@@ -80,13 +91,14 @@ const AddCustomerScreen = ({ navigation }) => {
           <Text style={styles.hint}>Set to 0 to allow unlimited credit</Text>
         </View>
 
-        <TouchableOpacity
-          style={[styles.saveBtn, saving && styles.saveBtnDisabled]}
+        <DukaButton
+          label={saving ? 'Saving...' : 'Save Customer'}
           onPress={handleSave}
-          disabled={saving}
-        >
-          <Text style={styles.saveBtnText}>{saving ? 'Saving...' : 'Add Customer'}</Text>
-        </TouchableOpacity>
+          loading={saving}
+          variant="primary"
+          size="lg"
+          style={styles.saveBtn}
+        />
 
         <View style={{ height: 40 }} />
       </ScrollView>
@@ -95,30 +107,59 @@ const AddCustomerScreen = ({ navigation }) => {
 };
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: COLORS.background },
+  container: { flex: 1, backgroundColor: COLORS.cream },
   scroll: { padding: 16 },
 
+  avatarPreview: {
+    alignItems: 'center',
+    paddingVertical: 24,
+  },
+  avatarHint: {
+    fontFamily: 'PlusJakartaSans_600SemiBold',
+    fontSize: 16,
+    color: COLORS.textPrimary,
+    marginTop: 12,
+  },
+
   card: {
-    backgroundColor: COLORS.surface, borderRadius: 14, padding: 18,
-    marginBottom: 20, elevation: 2,
-    shadowColor: '#000', shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.08, shadowRadius: 6,
+    backgroundColor: COLORS.surface,
+    borderRadius: 16,
+    padding: 18,
+    marginBottom: 20,
+    ...shadows.md,
   },
-  cardTitle: { fontSize: 16, fontWeight: '700', color: COLORS.textPrimary, marginBottom: 16 },
+  cardTitle: {
+    fontFamily: 'PlusJakartaSans_700Bold',
+    fontSize: 16,
+    color: COLORS.textPrimary,
+    marginBottom: 16,
+  },
 
-  label: { fontSize: 13, fontWeight: '600', color: COLORS.textSecondary, marginBottom: 6, marginTop: 14 },
+  label: {
+    fontFamily: 'PlusJakartaSans_600SemiBold',
+    fontSize: 13,
+    color: COLORS.textSecondary,
+    marginBottom: 6,
+    marginTop: 14,
+  },
   input: {
-    backgroundColor: COLORS.background, borderRadius: 10, padding: 14,
-    fontSize: 16, color: COLORS.textPrimary, borderWidth: 1, borderColor: COLORS.border,
+    backgroundColor: COLORS.cream,
+    borderRadius: 12,
+    padding: 14,
+    fontFamily: 'PlusJakartaSans_400Regular',
+    fontSize: 16,
+    color: COLORS.textPrimary,
+    borderWidth: 1.5,
+    borderColor: COLORS.border,
   },
-  hint: { fontSize: 12, color: COLORS.textMuted, marginTop: 4 },
+  hint: {
+    fontFamily: 'PlusJakartaSans_400Regular',
+    fontSize: 12,
+    color: COLORS.textMuted,
+    marginTop: 4,
+  },
 
-  saveBtn: {
-    backgroundColor: COLORS.primary, borderRadius: 12,
-    paddingVertical: 16, alignItems: 'center',
-  },
-  saveBtnDisabled: { opacity: 0.6 },
-  saveBtnText: { color: '#FFF', fontSize: 17, fontWeight: 'bold' },
+  saveBtn: { alignSelf: 'stretch' },
 });
 
 export default AddCustomerScreen;

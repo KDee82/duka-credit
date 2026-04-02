@@ -1,20 +1,22 @@
 import React, { useState, useCallback } from 'react';
 import {
-  View, Text, StyleSheet, TouchableOpacity, TextInput,
+  View, Text, StyleSheet, Pressable, TextInput,
   ScrollView, Alert, StatusBar, KeyboardAvoidingView, Platform,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { getAllCustomers } from '../db/customers';
 import { addTransaction } from '../db/transactions';
 import { formatKES, getInitials } from '../utils/formatters';
-import { COLORS } from '../utils/constants';
+import { COLORS } from '../theme/colors';
+import { shadows } from '../theme/shadows';
 import { useFocusEffect } from '@react-navigation/native';
+import DukaAvatar from '../components/DukaAvatar';
+import DukaButton from '../components/DukaButton';
 
 const AddTransactionScreen = ({ route, navigation }) => {
-  // Pre-fill if navigated from a customer's screen
   const preselected = route.params || {};
 
-  const [type, setType] = useState('credit'); // 'credit' | 'payment'
+  const [type, setType] = useState('credit');
   const [amount, setAmount] = useState('');
   const [description, setDescription] = useState('');
   const [note, setNote] = useState('');
@@ -55,7 +57,6 @@ const AddTransactionScreen = ({ route, navigation }) => {
       Alert.alert('Invalid Amount', 'Please enter a valid amount greater than 0.');
       return;
     }
-
     setSaving(true);
     try {
       addTransaction(selectedCustomer.id, type, amountNum, description, note);
@@ -66,83 +67,98 @@ const AddTransactionScreen = ({ route, navigation }) => {
     }
   };
 
+  const isCredit = type === 'credit';
+
   return (
     <KeyboardAvoidingView
       style={styles.container}
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
     >
-      <StatusBar backgroundColor={COLORS.primary} barStyle="light-content" />
+      <StatusBar backgroundColor={COLORS.navy} barStyle="light-content" />
 
       <ScrollView contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled">
 
-        {/* Type toggle */}
-        <View style={styles.typeToggle}>
-          <TouchableOpacity
-            style={[styles.typeBtn, type === 'credit' && styles.typeBtnActiveCredit]}
+        {/* Pill toggle */}
+        <View style={styles.toggleContainer}>
+          <Pressable
+            style={[styles.toggleBtn, isCredit && styles.toggleBtnCreditActive]}
             onPress={() => setType('credit')}
+            android_ripple={{ color: 'rgba(255,255,255,0.2)' }}
           >
-            <Ionicons name="arrow-up-circle" size={22} color={type === 'credit' ? '#FFF' : COLORS.textSecondary} />
-            <Text style={[styles.typeBtnText, type === 'credit' && styles.typeBtnTextActive]}>
+            <Ionicons
+              name="arrow-up-circle"
+              size={18}
+              color={isCredit ? COLORS.white : COLORS.textSecondary}
+            />
+            <Text style={[styles.toggleBtnText, isCredit && styles.toggleBtnTextActive]}>
               Credit Sale
             </Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[styles.typeBtn, type === 'payment' && styles.typeBtnActivePayment]}
+          </Pressable>
+          <Pressable
+            style={[styles.toggleBtn, !isCredit && styles.toggleBtnPaymentActive]}
             onPress={() => setType('payment')}
+            android_ripple={{ color: 'rgba(255,255,255,0.2)' }}
           >
-            <Ionicons name="arrow-down-circle" size={22} color={type === 'payment' ? '#FFF' : COLORS.textSecondary} />
-            <Text style={[styles.typeBtnText, type === 'payment' && styles.typeBtnTextActive]}>
-              Payment Received
+            <Ionicons
+              name="arrow-down-circle"
+              size={18}
+              color={!isCredit ? COLORS.white : COLORS.textSecondary}
+            />
+            <Text style={[styles.toggleBtnText, !isCredit && styles.toggleBtnTextActive]}>
+              Payment
             </Text>
-          </TouchableOpacity>
+          </Pressable>
         </View>
 
         {/* Customer selector */}
         <Text style={styles.label}>Customer *</Text>
-        <TouchableOpacity
+        <Pressable
           style={styles.customerSelector}
           onPress={() => setShowPicker(!showPicker)}
+          android_ripple={{ color: COLORS.border }}
         >
           {selectedCustomer ? (
             <View style={styles.selectedCustomer}>
-              <View style={styles.mini_avatar}>
-                <Text style={styles.mini_avatar_text}>{getInitials(selectedCustomer.name)}</Text>
-              </View>
+              <DukaAvatar name={selectedCustomer.name} size="sm" />
               <Text style={styles.selectedName}>{selectedCustomer.name}</Text>
             </View>
           ) : (
             <Text style={styles.selectorPlaceholder}>Select a customer...</Text>
           )}
-          <Ionicons name={showPicker ? 'chevron-up' : 'chevron-down'} size={18} color={COLORS.textSecondary} />
-        </TouchableOpacity>
+          <Ionicons
+            name={showPicker ? 'chevron-up' : 'chevron-down'}
+            size={18}
+            color={COLORS.textSecondary}
+          />
+        </Pressable>
 
         {showPicker && (
           <View style={styles.pickerDropdown}>
             <TextInput
               style={styles.pickerSearch}
               placeholder="Search customers..."
+              placeholderTextColor={COLORS.textMuted}
               value={pickerQuery}
               onChangeText={setPickerQuery}
               autoFocus
             />
             {filteredCustomers.slice(0, 8).map(c => (
-              <TouchableOpacity
+              <Pressable
                 key={c.id}
                 style={styles.pickerItem}
+                android_ripple={{ color: COLORS.border }}
                 onPress={() => {
                   setSelectedCustomer(c);
                   setShowPicker(false);
                   setPickerQuery('');
                 }}
               >
-                <View style={styles.mini_avatar}>
-                  <Text style={styles.mini_avatar_text}>{getInitials(c.name)}</Text>
-                </View>
-                <View>
+                <DukaAvatar name={c.name} size="sm" />
+                <View style={{ marginLeft: 10 }}>
                   <Text style={styles.pickerName}>{c.name}</Text>
                   <Text style={styles.pickerBalance}>Balance: {formatKES(c.balance)}</Text>
                 </View>
-              </TouchableOpacity>
+              </Pressable>
             ))}
             {filteredCustomers.length === 0 && (
               <Text style={styles.pickerEmpty}>No customers found</Text>
@@ -153,7 +169,7 @@ const AddTransactionScreen = ({ route, navigation }) => {
         {/* Amount */}
         <Text style={styles.label}>Amount (KES) *</Text>
         <TextInput
-          style={styles.amountInput}
+          style={[styles.amountInput, isCredit ? styles.amountInputCredit : styles.amountInputPayment]}
           placeholder="0.00"
           placeholderTextColor={COLORS.textMuted}
           value={amount}
@@ -166,7 +182,7 @@ const AddTransactionScreen = ({ route, navigation }) => {
         <Text style={styles.label}>Description (optional)</Text>
         <TextInput
           style={styles.input}
-          placeholder={type === 'credit' ? 'e.g. Sugar 2kg, Unga 5kg...' : 'e.g. Cash payment, M-PESA...'}
+          placeholder={isCredit ? 'e.g. Sugar 2kg, Unga 5kg...' : 'e.g. Cash payment, M-PESA...'}
           placeholderTextColor={COLORS.textMuted}
           value={description}
           onChangeText={setDescription}
@@ -184,32 +200,30 @@ const AddTransactionScreen = ({ route, navigation }) => {
           numberOfLines={2}
         />
 
-        {/* Summary */}
+        {/* Summary preview */}
         {selectedCustomer && amount && parseFloat(amount) > 0 && (
-          <View style={[styles.summary, type === 'credit' ? styles.summaryCred : styles.summaryPay]}>
+          <View style={[styles.summary, isCredit ? styles.summaryCred : styles.summaryPay]}>
             <Ionicons
-              name={type === 'credit' ? 'information-circle' : 'checkmark-circle'}
+              name={isCredit ? 'information-circle' : 'checkmark-circle'}
               size={18}
-              color={type === 'credit' ? COLORS.danger : COLORS.accent}
+              color={isCredit ? COLORS.coral : COLORS.emerald}
             />
-            <Text style={[styles.summaryText, { color: type === 'credit' ? COLORS.danger : COLORS.accent }]}>
-              {type === 'credit'
+            <Text style={[styles.summaryText, { color: isCredit ? COLORS.coral : COLORS.emerald }]}>
+              {isCredit
                 ? `${selectedCustomer.name} will owe you ${formatKES(parseFloat(amount))}`
                 : `${selectedCustomer.name} is paying ${formatKES(parseFloat(amount))}`}
             </Text>
           </View>
         )}
 
-        {/* Save button */}
-        <TouchableOpacity
-          style={[styles.saveBtn, saving && styles.saveBtnDisabled]}
+        <DukaButton
+          label={saving ? 'Saving...' : `Confirm ${isCredit ? 'Credit' : 'Payment'}`}
           onPress={handleSave}
-          disabled={saving}
-        >
-          <Text style={styles.saveBtnText}>
-            {saving ? 'Saving...' : `Confirm ${type === 'credit' ? 'Credit' : 'Payment'}`}
-          </Text>
-        </TouchableOpacity>
+          loading={saving}
+          variant="primary"
+          size="lg"
+          style={styles.saveBtn}
+        />
 
         <View style={{ height: 40 }} />
       </ScrollView>
@@ -218,74 +232,151 @@ const AddTransactionScreen = ({ route, navigation }) => {
 };
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: COLORS.background },
+  container: { flex: 1, backgroundColor: COLORS.cream },
   scroll: { padding: 16 },
 
-  typeToggle: { flexDirection: 'row', gap: 10, marginBottom: 20 },
-  typeBtn: {
-    flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6,
-    paddingVertical: 14, borderRadius: 12, borderWidth: 2, borderColor: COLORS.border,
+  toggleContainer: {
+    flexDirection: 'row',
     backgroundColor: COLORS.surface,
+    borderRadius: 14,
+    padding: 4,
+    marginBottom: 20,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    ...shadows.sm,
   },
-  typeBtnActiveCredit: { backgroundColor: COLORS.danger, borderColor: COLORS.danger },
-  typeBtnActivePayment: { backgroundColor: COLORS.accent, borderColor: COLORS.accent },
-  typeBtnText: { fontSize: 14, fontWeight: '600', color: COLORS.textSecondary },
-  typeBtnTextActive: { color: '#FFF' },
+  toggleBtn: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    paddingVertical: 12,
+    borderRadius: 10,
+  },
+  toggleBtnCreditActive: { backgroundColor: COLORS.coral },
+  toggleBtnPaymentActive: { backgroundColor: COLORS.emerald },
+  toggleBtnText: {
+    fontFamily: 'PlusJakartaSans_600SemiBold',
+    fontSize: 14,
+    color: COLORS.textSecondary,
+  },
+  toggleBtnTextActive: { color: COLORS.white },
 
-  label: { fontSize: 13, fontWeight: '600', color: COLORS.textSecondary, marginBottom: 6, marginTop: 12 },
+  label: {
+    fontFamily: 'PlusJakartaSans_600SemiBold',
+    fontSize: 13,
+    color: COLORS.textSecondary,
+    marginBottom: 6,
+    marginTop: 12,
+  },
 
   customerSelector: {
-    backgroundColor: COLORS.surface, borderRadius: 10, padding: 14,
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    borderWidth: 1, borderColor: COLORS.border,
+    backgroundColor: COLORS.surface,
+    borderRadius: 12,
+    padding: 14,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    borderWidth: 1.5,
+    borderColor: COLORS.border,
   },
   selectedCustomer: { flexDirection: 'row', alignItems: 'center', gap: 10 },
-  selectorPlaceholder: { color: COLORS.textMuted, fontSize: 15 },
-  selectedName: { fontSize: 15, fontWeight: '600', color: COLORS.textPrimary },
-  mini_avatar: {
-    width: 32, height: 32, borderRadius: 16,
-    backgroundColor: COLORS.primaryLight, alignItems: 'center', justifyContent: 'center',
+  selectorPlaceholder: {
+    fontFamily: 'PlusJakartaSans_400Regular',
+    color: COLORS.textMuted,
+    fontSize: 15,
   },
-  mini_avatar_text: { color: COLORS.primary, fontWeight: 'bold', fontSize: 12 },
+  selectedName: {
+    fontFamily: 'PlusJakartaSans_600SemiBold',
+    fontSize: 15,
+    color: COLORS.textPrimary,
+  },
 
   pickerDropdown: {
-    backgroundColor: COLORS.surface, borderRadius: 10, borderWidth: 1,
-    borderColor: COLORS.border, marginTop: 4, overflow: 'hidden',
+    backgroundColor: COLORS.surface,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    marginTop: 4,
+    overflow: 'hidden',
+    ...shadows.sm,
   },
   pickerSearch: {
-    padding: 12, borderBottomWidth: 1, borderBottomColor: COLORS.border,
-    fontSize: 15, color: COLORS.textPrimary,
+    padding: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: COLORS.border,
+    fontFamily: 'PlusJakartaSans_400Regular',
+    fontSize: 15,
+    color: COLORS.textPrimary,
   },
   pickerItem: {
-    flexDirection: 'row', alignItems: 'center', gap: 10, padding: 12,
-    borderBottomWidth: 1, borderBottomColor: COLORS.background,
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: COLORS.cream,
   },
-  pickerName: { fontSize: 15, fontWeight: '600', color: COLORS.textPrimary },
-  pickerBalance: { fontSize: 12, color: COLORS.textSecondary },
-  pickerEmpty: { padding: 16, color: COLORS.textMuted, textAlign: 'center' },
+  pickerName: {
+    fontFamily: 'PlusJakartaSans_600SemiBold',
+    fontSize: 15,
+    color: COLORS.textPrimary,
+  },
+  pickerBalance: {
+    fontFamily: 'PlusJakartaSans_400Regular',
+    fontSize: 12,
+    color: COLORS.textSecondary,
+  },
+  pickerEmpty: {
+    fontFamily: 'PlusJakartaSans_400Regular',
+    padding: 16,
+    color: COLORS.textMuted,
+    textAlign: 'center',
+  },
 
   amountInput: {
-    backgroundColor: COLORS.surface, borderRadius: 10, padding: 16,
-    fontSize: 32, fontWeight: 'bold', color: COLORS.textPrimary,
-    borderWidth: 1, borderColor: COLORS.border, textAlign: 'center',
+    backgroundColor: COLORS.surface,
+    borderRadius: 14,
+    padding: 18,
+    fontFamily: 'PlusJakartaSans_800ExtraBold',
+    fontSize: 36,
+    color: COLORS.textPrimary,
+    borderWidth: 2,
+    textAlign: 'center',
+    ...shadows.sm,
   },
+  amountInputCredit: { borderColor: COLORS.coral, color: COLORS.coral },
+  amountInputPayment: { borderColor: COLORS.emerald, color: COLORS.emerald },
+
   input: {
-    backgroundColor: COLORS.surface, borderRadius: 10, padding: 14,
-    fontSize: 15, color: COLORS.textPrimary, borderWidth: 1, borderColor: COLORS.border,
+    backgroundColor: COLORS.surface,
+    borderRadius: 12,
+    padding: 14,
+    fontFamily: 'PlusJakartaSans_400Regular',
+    fontSize: 15,
+    color: COLORS.textPrimary,
+    borderWidth: 1.5,
+    borderColor: COLORS.border,
   },
   noteInput: { minHeight: 60, textAlignVertical: 'top' },
 
-  summary: { flexDirection: 'row', alignItems: 'center', gap: 8, padding: 12, borderRadius: 10, marginTop: 16 },
-  summaryCred: { backgroundColor: COLORS.dangerLight },
-  summaryPay: { backgroundColor: COLORS.accentLight },
-  summaryText: { fontSize: 14, fontWeight: '600', flex: 1 },
-
-  saveBtn: {
-    backgroundColor: COLORS.primary, borderRadius: 12,
-    paddingVertical: 16, alignItems: 'center', marginTop: 20,
+  summary: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    padding: 14,
+    borderRadius: 12,
+    marginTop: 16,
   },
-  saveBtnDisabled: { opacity: 0.6 },
-  saveBtnText: { color: '#FFF', fontSize: 17, fontWeight: 'bold' },
+  summaryCred: { backgroundColor: COLORS.coralLight },
+  summaryPay: { backgroundColor: COLORS.emeraldLight },
+  summaryText: {
+    fontFamily: 'PlusJakartaSans_600SemiBold',
+    fontSize: 14,
+    flex: 1,
+  },
+
+  saveBtn: { marginTop: 24, alignSelf: 'stretch' },
 });
 
 export default AddTransactionScreen;

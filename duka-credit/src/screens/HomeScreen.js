@@ -1,13 +1,16 @@
 import React, { useState, useCallback } from 'react';
 import {
-  View, Text, StyleSheet, ScrollView, TouchableOpacity,
+  View, Text, StyleSheet, ScrollView, Pressable,
   RefreshControl, StatusBar,
 } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { getTotalOutstanding, getTodaySummary, getTopDebtors } from '../db/transactions';
-import { formatKES, formatKESShort, getInitials } from '../utils/formatters';
-import { COLORS } from '../utils/constants';
+import { formatKES, formatKESShort } from '../utils/formatters';
+import { COLORS } from '../theme/colors';
+import { shadows } from '../theme/shadows';
+import DukaAvatar from '../components/DukaAvatar';
+import EmptyState from '../components/EmptyState';
 
 const HomeScreen = ({ navigation }) => {
   const [outstanding, setOutstanding] = useState(0);
@@ -39,147 +42,214 @@ const HomeScreen = ({ navigation }) => {
 
   return (
     <View style={styles.container}>
-      <StatusBar backgroundColor={COLORS.primary} barStyle="light-content" />
+      <StatusBar backgroundColor={COLORS.navy} barStyle="light-content" />
 
       <ScrollView
         contentContainerStyle={styles.scroll}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[COLORS.primary]} />}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[COLORS.gold]} />}
       >
-        {/* Total Outstanding Card */}
-        <View style={styles.outstandingCard}>
-          <Text style={styles.outstandingLabel}>Total Outstanding</Text>
-          <Text style={styles.outstandingAmount}>{formatKES(outstanding)}</Text>
-          <Text style={styles.outstandingSubtext}>owed to you across all customers</Text>
+        {/* Hero outstanding card */}
+        <View style={styles.heroCard}>
+          <Text style={styles.heroLabel}>Total Outstanding</Text>
+          <Text style={styles.heroAmount}>{formatKES(outstanding)}</Text>
+          <Text style={styles.heroSubtext}>owed to you across all customers</Text>
         </View>
 
-        {/* Today's Summary */}
-        <Text style={styles.sectionTitle}>Today's Activity</Text>
-        <View style={styles.summaryRow}>
-          <View style={[styles.summaryCard, styles.creditCard]}>
-            <Ionicons name="arrow-up-circle" size={28} color={COLORS.danger} />
-            <Text style={styles.summaryLabel}>Credit Given</Text>
-            <Text style={[styles.summaryAmount, { color: COLORS.danger }]}>
+        {/* Today's stat cards */}
+        <View style={styles.statRow}>
+          <View style={[styles.statCard, styles.statCardCredit]}>
+            <View style={styles.statIconWrap}>
+              <Ionicons name="arrow-up-circle" size={22} color={COLORS.coral} />
+            </View>
+            <Text style={styles.statLabel}>Credit Given</Text>
+            <Text style={[styles.statAmount, { color: COLORS.coral }]}>
               {formatKESShort(summary.total_credit)}
             </Text>
           </View>
-          <View style={[styles.summaryCard, styles.paymentCard]}>
-            <Ionicons name="arrow-down-circle" size={28} color={COLORS.accent} />
-            <Text style={styles.summaryLabel}>Payments In</Text>
-            <Text style={[styles.summaryAmount, { color: COLORS.accent }]}>
+          <View style={[styles.statCard, styles.statCardPayment]}>
+            <View style={styles.statIconWrap}>
+              <Ionicons name="arrow-down-circle" size={22} color={COLORS.emerald} />
+            </View>
+            <Text style={styles.statLabel}>Payments In</Text>
+            <Text style={[styles.statAmount, { color: COLORS.emerald }]}>
               {formatKESShort(summary.total_payments)}
             </Text>
           </View>
         </View>
 
-        {/* Top Debtors */}
+        {/* Top Debtors section */}
         <View style={styles.sectionHeader}>
-          <Text style={styles.sectionTitle}>Top Debtors</Text>
-          <TouchableOpacity onPress={() => navigation.navigate('Customers')}>
+          <View>
+            <Text style={styles.sectionTitle}>Top Debtors</Text>
+            <View style={styles.goldUnderline} />
+          </View>
+          <Pressable onPress={() => navigation.navigate('Customers')}>
             <Text style={styles.seeAll}>See all</Text>
-          </TouchableOpacity>
+          </Pressable>
         </View>
 
         {topDebtors.length === 0 ? (
-          <View style={styles.emptyState}>
-            <Ionicons name="checkmark-circle" size={48} color={COLORS.accent} />
-            <Text style={styles.emptyText}>No outstanding balances!</Text>
-            <Text style={styles.emptySubtext}>All customers are settled up.</Text>
-          </View>
+          <EmptyState
+            icon="checkmark-circle-outline"
+            title="All settled up!"
+            subtitle="No outstanding balances right now."
+          />
         ) : (
           topDebtors.map((customer) => (
-            <TouchableOpacity
+            <Pressable
               key={customer.id}
-              style={styles.debtorRow}
+              style={({ pressed }) => [styles.debtorRow, pressed && styles.rowPressed]}
+              android_ripple={{ color: COLORS.border }}
               onPress={() => navigation.navigate('CustomerDetail', {
                 customerId: customer.id,
                 customerName: customer.name,
               })}
             >
-              <View style={styles.avatar}>
-                <Text style={styles.avatarText}>{getInitials(customer.name)}</Text>
-              </View>
+              <DukaAvatar name={customer.name} size="md" />
               <View style={styles.debtorInfo}>
                 <Text style={styles.debtorName}>{customer.name}</Text>
                 <Text style={styles.debtorPhone}>{customer.phone || 'No phone'}</Text>
               </View>
               <Text style={styles.debtorBalance}>{formatKES(customer.balance)}</Text>
-            </TouchableOpacity>
+            </Pressable>
           ))
         )}
 
         <View style={{ height: 100 }} />
       </ScrollView>
 
-      {/* FAB */}
-      <TouchableOpacity
-        style={styles.fab}
+      {/* Gold FAB */}
+      <Pressable
+        style={({ pressed }) => [styles.fab, pressed && { opacity: 0.85 }]}
+        android_ripple={{ color: 'rgba(255,255,255,0.3)', borderless: true }}
         onPress={() => navigation.navigate('AddTransaction')}
       >
-        <Ionicons name="add" size={32} color="#FFF" />
-      </TouchableOpacity>
+        <Ionicons name="add" size={32} color={COLORS.navy} />
+      </Pressable>
     </View>
   );
 };
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: COLORS.background },
+  container: { flex: 1, backgroundColor: COLORS.cream },
   scroll: { padding: 16 },
 
-  outstandingCard: {
-    backgroundColor: COLORS.primary,
-    borderRadius: 16,
-    padding: 24,
+  heroCard: {
+    backgroundColor: COLORS.navy,
+    borderRadius: 20,
+    padding: 28,
     alignItems: 'center',
-    marginBottom: 20,
-    elevation: 4,
-    shadowColor: COLORS.primary,
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
+    marginBottom: 16,
+    ...shadows.lg,
   },
-  outstandingLabel: { color: 'rgba(255,255,255,0.8)', fontSize: 14, fontWeight: '500' },
-  outstandingAmount: { color: '#FFF', fontSize: 42, fontWeight: 'bold', marginVertical: 6 },
-  outstandingSubtext: { color: 'rgba(255,255,255,0.6)', fontSize: 12 },
-
-  summaryRow: { flexDirection: 'row', gap: 12, marginBottom: 20 },
-  summaryCard: {
-    flex: 1, backgroundColor: COLORS.surface, borderRadius: 12, padding: 16,
-    alignItems: 'center', elevation: 2,
-    shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.08, shadowRadius: 4,
+  heroLabel: {
+    fontFamily: 'PlusJakartaSans_500Medium',
+    color: 'rgba(255,255,255,0.7)',
+    fontSize: 13,
+    textTransform: 'uppercase',
+    letterSpacing: 0.8,
+    marginBottom: 8,
   },
-  summaryLabel: { color: COLORS.textSecondary, fontSize: 12, marginTop: 6, fontWeight: '500' },
-  summaryAmount: { fontSize: 22, fontWeight: 'bold', marginTop: 2 },
+  heroAmount: {
+    fontFamily: 'PlusJakartaSans_800ExtraBold',
+    color: COLORS.coral,
+    fontSize: 42,
+    lineHeight: 50,
+    marginBottom: 6,
+  },
+  heroSubtext: {
+    fontFamily: 'PlusJakartaSans_400Regular',
+    color: 'rgba(255,255,255,0.5)',
+    fontSize: 12,
+  },
 
-  sectionHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 },
-  sectionTitle: { fontSize: 17, fontWeight: '700', color: COLORS.textPrimary, marginBottom: 8 },
-  seeAll: { color: COLORS.primary, fontWeight: '600', fontSize: 14 },
+  statRow: { flexDirection: 'row', gap: 12, marginBottom: 24 },
+  statCard: {
+    flex: 1,
+    backgroundColor: COLORS.surface,
+    borderRadius: 14,
+    padding: 16,
+    alignItems: 'center',
+    ...shadows.sm,
+  },
+  statCardCredit: { borderTopWidth: 3, borderTopColor: COLORS.coralLight },
+  statCardPayment: { borderTopWidth: 3, borderTopColor: COLORS.emeraldLight },
+  statIconWrap: { marginBottom: 6 },
+  statLabel: {
+    fontFamily: 'PlusJakartaSans_500Medium',
+    color: COLORS.textSecondary,
+    fontSize: 11,
+    marginBottom: 4,
+  },
+  statAmount: {
+    fontFamily: 'PlusJakartaSans_700Bold',
+    fontSize: 20,
+  },
+
+  sectionHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    marginBottom: 12,
+  },
+  sectionTitle: {
+    fontFamily: 'PlusJakartaSans_700Bold',
+    fontSize: 17,
+    color: COLORS.textPrimary,
+    marginBottom: 4,
+  },
+  goldUnderline: {
+    height: 3,
+    width: 40,
+    backgroundColor: COLORS.gold,
+    borderRadius: 2,
+  },
+  seeAll: {
+    fontFamily: 'PlusJakartaSans_600SemiBold',
+    color: COLORS.gold,
+    fontSize: 14,
+    marginTop: 2,
+  },
 
   debtorRow: {
-    backgroundColor: COLORS.surface, borderRadius: 12, padding: 14,
-    flexDirection: 'row', alignItems: 'center', marginBottom: 8,
-    elevation: 1, shadowColor: '#000', shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.06, shadowRadius: 3,
+    backgroundColor: COLORS.surface,
+    borderRadius: 14,
+    padding: 14,
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 8,
+    ...shadows.sm,
   },
-  avatar: {
-    width: 44, height: 44, borderRadius: 22,
-    backgroundColor: COLORS.primaryLight, alignItems: 'center', justifyContent: 'center', marginRight: 12,
+  rowPressed: { opacity: 0.85 },
+  debtorInfo: { flex: 1, marginLeft: 12 },
+  debtorName: {
+    fontFamily: 'PlusJakartaSans_600SemiBold',
+    fontSize: 15,
+    color: COLORS.textPrimary,
   },
-  avatarText: { color: COLORS.primary, fontWeight: 'bold', fontSize: 16 },
-  debtorInfo: { flex: 1 },
-  debtorName: { fontSize: 15, fontWeight: '600', color: COLORS.textPrimary },
-  debtorPhone: { fontSize: 13, color: COLORS.textSecondary, marginTop: 2 },
-  debtorBalance: { fontSize: 16, fontWeight: 'bold', color: COLORS.danger },
-
-  emptyState: { alignItems: 'center', paddingVertical: 40 },
-  emptyText: { fontSize: 18, fontWeight: '700', color: COLORS.textPrimary, marginTop: 12 },
-  emptySubtext: { fontSize: 14, color: COLORS.textSecondary, marginTop: 4 },
+  debtorPhone: {
+    fontFamily: 'PlusJakartaSans_400Regular',
+    fontSize: 13,
+    color: COLORS.textSecondary,
+    marginTop: 2,
+  },
+  debtorBalance: {
+    fontFamily: 'PlusJakartaSans_700Bold',
+    fontSize: 16,
+    color: COLORS.coral,
+  },
 
   fab: {
-    position: 'absolute', right: 20, bottom: 24,
-    width: 60, height: 60, borderRadius: 30,
-    backgroundColor: COLORS.primary, alignItems: 'center', justifyContent: 'center',
-    elevation: 8, shadowColor: COLORS.primary, shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.4, shadowRadius: 8,
+    position: 'absolute',
+    right: 20,
+    bottom: 24,
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    backgroundColor: COLORS.gold,
+    alignItems: 'center',
+    justifyContent: 'center',
+    ...shadows.gold,
   },
 });
 

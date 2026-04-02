@@ -3,13 +3,16 @@ import { View, Text, ActivityIndicator, StyleSheet } from 'react-native';
 import { NavigationContainer } from '@react-navigation/native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { StatusBar } from 'expo-status-bar';
+import { useFonts } from 'expo-font';
 import { initDB } from './src/db/database';
 import AppNavigator from './src/navigation/AppNavigator';
 import { COLORS } from './src/utils/constants';
+import { fonts } from './src/theme/typography';
 
 export default function App() {
   const [ready, setReady] = useState(false);
   const [error, setError] = useState(null);
+  const [fontsLoaded] = useFonts(fonts);
 
   useEffect(() => {
     const setup = async () => {
@@ -33,12 +36,12 @@ export default function App() {
     );
   }
 
-  if (!ready) {
+  if (!ready || !fontsLoaded) {
     return (
       <View style={styles.center}>
         <Text style={styles.logo}>🏪</Text>
         <Text style={styles.appName}>Duka Credit</Text>
-        <ActivityIndicator color={COLORS.primary} size="large" style={{ marginTop: 20 }} />
+        <ActivityIndicator color={COLORS.gold} size="large" style={{ marginTop: 20 }} />
       </View>
     );
   }
@@ -46,7 +49,7 @@ export default function App() {
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
       <NavigationContainer>
-        <StatusBar style="light" backgroundColor={COLORS.primary} />
+        <StatusBar style="light" backgroundColor={COLORS.navy} />
         <AppNavigator />
       </NavigationContainer>
     </GestureHandlerRootView>
@@ -56,7 +59,7 @@ export default function App() {
 const styles = StyleSheet.create({
   center: {
     flex: 1, alignItems: 'center', justifyContent: 'center',
-    backgroundColor: COLORS.primary,
+    backgroundColor: COLORS.navy,
   },
   logo: { fontSize: 64 },
   appName: { fontSize: 28, fontWeight: 'bold', color: '#FFF', marginTop: 12 },
