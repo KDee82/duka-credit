@@ -1,6 +1,6 @@
 import React, { useState, useCallback } from 'react';
 import {
-  View, Text, StyleSheet, FlatList, TouchableOpacity, TextInput,
+  View, Text, StyleSheet, FlatList, TouchableOpacity, TextInput, Pressable,
 } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
@@ -48,7 +48,7 @@ export default function CustomerListScreen({ navigation }) {
       <FlatList
         data={filtered}
         keyExtractor={(item) => String(item.id)}
-        contentContainerStyle={{ paddingBottom: 80 }}
+        contentContainerStyle={{ paddingBottom: 90 }}
         renderItem={({ item }) => (
           <TouchableOpacity
             style={styles.customerRow}
@@ -98,12 +98,14 @@ export default function CustomerListScreen({ navigation }) {
       />
 
       {/* FAB */}
-      <TouchableOpacity
+      <Pressable
         style={styles.fab}
         onPress={() => navigation.navigate('AddCustomer')}
+        android_ripple={{ color: 'rgba(255,255,255,0.3)', borderless: false }}
       >
-        <Ionicons name="person-add" size={22} color={COLORS.white} />
-      </TouchableOpacity>
+        <Ionicons name="add" size={22} color="#FFF" />
+        <Text style={styles.fabText}>Add Customer</Text>
+      </Pressable>
     </View>
   );
 }
@@ -157,19 +159,14 @@ const styles = StyleSheet.create({
   },
   emptyBtnText: { color: COLORS.white, fontWeight: '600', fontSize: FONT_SIZES.md },
   fab: {
-    position: 'absolute',
-    bottom: 24,
-    right: 24,
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    backgroundColor: COLORS.primary,
-    alignItems: 'center',
-    justifyContent: 'center',
-    elevation: 6,
-    shadowColor: '#000',
+    position: 'absolute', right: 16, bottom: 20,
+    flexDirection: 'row', alignItems: 'center',
+    backgroundColor: '#1E5A9E', borderRadius: 28,
+    paddingVertical: 14, paddingHorizontal: 20,
+    elevation: 6, shadowColor: '#1E5A9E',
     shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.3,
-    shadowRadius: 4,
+    shadowOpacity: 0.35, shadowRadius: 8,
+    gap: 8,
   },
+  fabText: { color: '#FFF', fontSize: 15, fontWeight: '700' },
 });

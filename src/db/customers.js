@@ -1,12 +1,17 @@
 import { getDB } from './database';
 
 export function addCustomer(name, phone, creditLimit = 0) {
-  const db = getDB();
-  const result = db.runSync(
-    `INSERT INTO customers (name, phone, credit_limit) VALUES (?, ?, ?)`,
-    [name, phone || null, creditLimit]
-  );
-  return getCustomerById(result.lastInsertRowId);
+  try {
+    const db = getDB();
+    const result = db.runSync(
+      `INSERT INTO customers (name, phone, credit_limit) VALUES (?, ?, ?)`,
+      [name, phone || null, creditLimit]
+    );
+    return getCustomerById(result.lastInsertRowId);
+  } catch (e) {
+    console.error('addCustomer failed:', e);
+    throw e;
+  }
 }
 
 export function getAllCustomers() {
