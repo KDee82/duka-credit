@@ -1,90 +1,147 @@
 import React, { useState } from 'react';
 import {
-  View, Text, StyleSheet, TextInput, TouchableOpacity,
-  ScrollView, Alert, KeyboardAvoidingView, Platform,
+  View, Text, TextInput, StyleSheet,
+  ScrollView, Alert, StatusBar, Pressable,
 } from 'react-native';
-import { COLORS, FONT_SIZES } from '../utils/constants';
+import { Ionicons } from '@expo/vector-icons';
 import { addCustomer } from '../db/customers';
+import { COLORS } from '../theme/colors';
+import { typography } from '../theme/typography';
+import { spacing, radius } from '../theme/spacing';
+import { shadows } from '../theme/shadows';
+import DukaAvatar from '../components/DukaAvatar';
+import DukaButton from '../components/DukaButton';
 
 export default function AddCustomerScreen({ navigation }) {
   const [name, setName] = useState('');
-  const [phone, setPhone] = useState('+254');
+  const [phone, setPhone] = useState('');
   const [creditLimit, setCreditLimit] = useState('');
+  const [saving, setSaving] = useState(false);
 
-  const handleSave = () => {
-    if (!name.trim()) {
-      Alert.alert('Required', 'Customer name is required.');
-      return;
-    }
-
-    const limit = parseFloat(creditLimit.replace(/,/g, '')) || 0;
-    const phoneVal = phone.trim() === '+254' ? '' : phone.trim();
-
+  const handleSave = async () => {
+    if (!name.trim()) return Alert.alert('Error', 'Customer name is required');
+    setSaving(true);
     try {
-      addCustomer(name.trim(), phoneVal || null, limit);
+      await addCustomer(name.trim(), phone.trim(), parseFloat(creditLimit) || 0);
       navigation.goBack();
     } catch (e) {
-      Alert.alert('Error', 'Failed to add customer. Please try again.');
-      console.error(e);
+      Alert.alert('Error', 'Failed to save customer: ' + (e?.message || 'Unknown error'));
+      setSaving(false);
     }
   };
 
   return (
-    <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-      <ScrollView style={styles.container} keyboardShouldPersistTaps="handled">
+    <View style={styles.root}>
+      <StatusBar barStyle="light-content" backgroundColor={COLORS.navy} />
 
-        <View style={styles.section}>
-          <Text style={styles.label}>Full Name *</Text>
+      {/* Header */}
+      <View style={styles.header}>
+        <Pressable onPress={() => navigation.goBack()} style={styles.backBtn}>
+          <Ionicons name="arrow-back" size={24} color={COLORS.white} />
+        </Pressable>
+        <Text style={[styles.headerTitle, typography.headingLarge]}>New Customer</Text>
+      </View>
+
+      <ScrollView style={styles.scroll} contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled">
+
+        {/* Avatar preview */}
+        <View style={styles.avatarWrap}>
+          <DukaAvatar name={name || '?'} size="xl" />
+          <Text style={[styles.avatarHint, typography.bodySmall]}>
+            {name.trim() ? name.trim() : 'Type a name below'}
+          </Text>
+        </View>
+
+        {/* Form */}
+        <View style={styles.card}>
+          <Text style={[styles.fieldLabel, typography.labelMedium]}>FULL NAME *</Text>
           <TextInput
-            style={styles.input}
-            placeholder="e.g. John Kamau"
+            style={[styles.input, typography.bodyLarge]}
             value={name}
             onChangeText={setName}
+            placeholder="e.g. Jane Wanjiku"
+            placeholderTextColor={COLORS.textMuted}
             autoCapitalize="words"
-            placeholderTextColor={COLORS.textLight}
           />
-        </View>
 
-        <View style={styles.section}>
-          <Text style={styles.label}>Phone Number</Text>
+          <View style={styles.divider} />
+
+          <Text style={[styles.fieldLabel, typography.labelMedium]}>PHONE NUMBER</Text>
           <TextInput
-            style={styles.input}
-            placeholder="+254700000000"
+            style={[styles.input, typography.bodyLarge]}
             value={phone}
             onChangeText={setPhone}
+            placeholder="e.g. 0712 345 678"
+            placeholderTextColor={COLORS.textMuted}
             keyboardType="phone-pad"
-            placeholderTextColor={COLORS.textLight}
           />
-          <Text style={styles.hint}>Format: +254XXXXXXXXX</Text>
-        </View>
 
-        <View style={styles.section}>
-          <Text style={styles.label}>Credit Limit (KES)</Text>
+          <View style={styles.divider} />
+
+          <Text style={[styles.fieldLabel, typography.labelMedium]}>CREDIT LIMIT (KES)</Text>
           <TextInput
-            style={styles.input}
-            placeholder="0 = unlimited"
+            style={[styles.input, typography.bodyLarge]}
             value={creditLimit}
             onChangeText={setCreditLimit}
+            placeholder="0 = unlimited"
+            placeholderTextColor={COLORS.textMuted}
             keyboardType="decimal-pad"
-            placeholderTextColor={COLORS.textLight}
           />
-          <Text style={styles.hint}>Set to 0 for no credit limit</Text>
         </View>
 
-        <TouchableOpacity style={styles.saveBtn} onPress={handleSave}>
-          <Text style={styles.saveBtnText}>Add Customer</Text>
-        </TouchableOpacity>
+        <DukaButton
+          label="Save Customer"
+          onPress={handleSave}
+          loading={saving}
+          style={styles.saveBtn}
+        />
       </ScrollView>
-    </KeyboardAvoidingView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: COLORS.background },
-  section: { marginHorizontal: 16, marginTop: 20 },
-  label: { fontSize: FONT_SIZES.sm, fontWeight: '600', color: COLORS.textLight, marginBottom: 8, textTransform: 'uppercase', letterSpacing: 0.3 },
-  input: { backgroundColor: COLORS.white, borderRadius: 10, padding: 14, fontSize: FONT_SIZES.md, color: COLORS.text, elevation: 1 },
-  hint: { fontSize: FONT_SIZES.xs, color: COLORS.textLight, marginTop: 4, marginLeft: 4 },
-  saveBtn: { margin: 16, marginTop: 32, padding: 18, borderRadius: 14, backgroundColor: COLORS.primary, alignItems: 'center', elevation: 2 },
-  saveBtnText: { color: COLORS.white, fontSize: FONT_SIZES.lg, fontWeight: '700' },
+  root: { flex: 1, backgroundColor: COLORS.cream },
+  header: {
+    backgroundColor: COLORS.navy,
+    paddingTop: 52,
+    paddingBottom: 20,
+    paddingHorizontal: spacing.lg,
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  backBtn: { marginRight: spacing.md },
+  headerTitle: { color: COLORS.white },
+  scroll: { flex: 1 },
+  scrollContent: { padding: spacing.lg },
+  avatarWrap: {
+    alignItems: 'center',
+    paddingVertical: spacing.xxl,
+  },
+  avatarHint: {
+    color: COLORS.textSecondary,
+    marginTop: spacing.md,
+  },
+  card: {
+    backgroundColor: COLORS.surface,
+    borderRadius: radius.xl,
+    padding: spacing.lg,
+    marginBottom: spacing.xl,
+    ...shadows.md,
+  },
+  fieldLabel: {
+    color: COLORS.textSecondary,
+    letterSpacing: 0.8,
+    marginBottom: spacing.xs,
+  },
+  input: {
+    color: COLORS.textPrimary,
+    paddingVertical: spacing.md,
+  },
+  divider: {
+    height: 1,
+    backgroundColor: COLORS.border,
+    marginVertical: spacing.md,
+  },
+  saveBtn: {},
 });

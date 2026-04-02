@@ -1,189 +1,209 @@
 import React, { useState, useCallback } from 'react';
-import { View, Text, StyleSheet, FlatList, TouchableOpacity, RefreshControl } from 'react-native';
+import {
+  View, Text, FlatList, StyleSheet, StatusBar,
+  Pressable, ScrollView,
+} from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
-import { COLORS, FONT_SIZES } from '../utils/constants';
-import { formatKES, getInitials, formatRelativeDate } from '../utils/formatters';
-import { getTotalOutstanding, getTodaySummary } from '../db/transactions';
-import { getAllCustomers } from '../db/customers';
+import { getTotalOutstanding, getTodaySummary, getTopDebtors } from '../db/transactions';
+import { COLORS } from '../theme/colors';
+import { typography } from '../theme/typography';
+import { spacing, radius } from '../theme/spacing';
+import { shadows } from '../theme/shadows';
+import { formatKES, formatKESShort } from '../utils/formatters';
+import DukaAvatar from '../components/DukaAvatar';
+import EmptyState from '../components/EmptyState';
 
 export default function HomeScreen({ navigation }) {
   const [outstanding, setOutstanding] = useState(0);
-  const [summary, setSummary] = useState({ total_credit: 0, total_payment: 0 });
+  const [todaySummary, setTodaySummary] = useState({ credits: 0, payments: 0 });
   const [topDebtors, setTopDebtors] = useState([]);
-  const [refreshing, setRefreshing] = useState(false);
-
-  const loadData = useCallback(() => {
-    try {
-      setOutstanding(getTotalOutstanding());
-      setSummary(getTodaySummary());
-      const customers = getAllCustomers();
-      setTopDebtors(customers.filter((c) => c.balance > 0).slice(0, 5));
-    } catch (e) {
-      console.error('HomeScreen load error:', e);
-    }
-  }, []);
 
   useFocusEffect(
     useCallback(() => {
-      loadData();
-    }, [loadData])
+      setOutstanding(getTotalOutstanding());
+      setTodaySummary(getTodaySummary());
+      setTopDebtors(getTopDebtors(5));
+    }, [])
   );
 
-  const onRefresh = () => {
-    setRefreshing(true);
-    loadData();
-    setRefreshing(false);
-  };
+  const renderDebtor = ({ item }) => (
+    <Pressable
+      style={styles.debtorRow}
+      onPress={() => navigation.navigate('Home', {
+        screen: 'CustomerDetail',
+        params: { customerId: item.id, customerName: item.name },
+      })}
+      android_ripple={{ color: 'rgba(15,31,61,0.05)' }}
+    >
+      <DukaAvatar name={item.name} size="md" />
+      <View style={styles.debtorInfo}>
+        <Text style={[styles.debtorName, typography.headingSmall]}>{item.name}</Text>
+        <Text style={[styles.debtorPhone, typography.bodySmall]}>{item.phone || 'No phone'}</Text>
+      </View>
+      <View style={styles.debtorAmountWrap}>
+        <Text style={[styles.debtorAmount, typography.amountMedium]}>{formatKESShort(item.balance)}</Text>
+        <Text style={[styles.owedLabel, typography.labelSmall]}>OWED</Text>
+      </View>
+    </Pressable>
+  );
 
   return (
-    <View style={styles.container}>
-      <FlatList
-        data={topDebtors}
-        keyExtractor={(item) => String(item.id)}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
-        ListHeaderComponent={
-          <>
-            {/* Outstanding card */}
-            <View style={styles.outstandingCard}>
-              <Text style={styles.outstandingLabel}>Total Outstanding</Text>
-              <Text style={styles.outstandingAmount}>{formatKES(outstanding)}</Text>
-            </View>
+    <View style={styles.root}>
+      <StatusBar barStyle="light-content" backgroundColor={COLORS.navy} />
 
-            {/* Today summary */}
-            <View style={styles.summaryRow}>
-              <View style={[styles.summaryCard, { borderLeftColor: COLORS.danger }]}>
-                <Text style={styles.summaryLabel}>Credit Given Today</Text>
-                <Text style={[styles.summaryAmount, { color: COLORS.danger }]}>
-                  {formatKES(summary.total_credit)}
-                </Text>
-              </View>
-              <View style={[styles.summaryCard, { borderLeftColor: COLORS.accent }]}>
-                <Text style={styles.summaryLabel}>Payments Received</Text>
-                <Text style={[styles.summaryAmount, { color: COLORS.accent }]}>
-                  {formatKES(summary.total_payment)}
-                </Text>
-              </View>
-            </View>
+      {/* Header */}
+      <View style={styles.header}>
+        <View>
+          <Text style={[styles.headerGreet, typography.bodyMedium]}>Good day 👋</Text>
+          <Text style={[styles.headerTitle, typography.headingLarge]}>Duka Credit</Text>
+        </View>
+        <View style={styles.headerIcon}>
+          <Ionicons name="storefront" size={26} color={COLORS.gold} />
+        </View>
+      </View>
 
-            {topDebtors.length > 0 && (
-              <Text style={styles.sectionTitle}>Top Debtors</Text>
-            )}
-          </>
-        }
-        renderItem={({ item }) => (
-          <TouchableOpacity
-            style={styles.debtorRow}
-            onPress={() => navigation.navigate('Customers', {
-              screen: 'CustomerDetail',
-              params: { customerId: item.id, customerName: item.name },
-            })}
-          >
-            <View style={styles.avatar}>
-              <Text style={styles.avatarText}>{getInitials(item.name)}</Text>
-            </View>
-            <View style={styles.debtorInfo}>
-              <Text style={styles.debtorName}>{item.name}</Text>
-              <Text style={styles.debtorSub}>
-                {item.last_transaction_at ? formatRelativeDate(item.last_transaction_at) : 'No activity'}
-              </Text>
-            </View>
-            <Text style={styles.debtorBalance}>{formatKES(item.balance)}</Text>
-          </TouchableOpacity>
-        )}
-        ListEmptyComponent={
-          <View style={styles.emptyState}>
-            <Ionicons name="people-outline" size={60} color={COLORS.border} />
-            <Text style={styles.emptyText}>No outstanding balances</Text>
-            <Text style={styles.emptySubtext}>Add customers and record credit sales to get started</Text>
+      <ScrollView style={styles.scroll} contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+        {/* Hero card */}
+        <View style={styles.heroCard}>
+          <Text style={[styles.heroLabel, typography.labelMedium]}>TOTAL OUTSTANDING</Text>
+          <Text style={[styles.heroAmount, typography.amountHero]}>{formatKES(outstanding)}</Text>
+          <Text style={[styles.heroSub, typography.bodySmall]}>across all customers</Text>
+        </View>
+
+        {/* Stat row */}
+        <View style={styles.statRow}>
+          <View style={[styles.statCard, styles.statCardCredit]}>
+            <Ionicons name="arrow-up-circle" size={22} color={COLORS.coral} />
+            <Text style={[styles.statLabel, typography.labelSmall]}>TODAY'S CREDIT</Text>
+            <Text style={[styles.statAmount, typography.amountMedium, { color: COLORS.coral }]}>
+              {formatKESShort(todaySummary.credits)}
+            </Text>
           </View>
-        }
-      />
+          <View style={[styles.statCard, styles.statCardPayment]}>
+            <Ionicons name="arrow-down-circle" size={22} color={COLORS.emerald} />
+            <Text style={[styles.statLabel, typography.labelSmall]}>TODAY'S PAYMENTS</Text>
+            <Text style={[styles.statAmount, typography.amountMedium, { color: COLORS.emerald }]}>
+              {formatKESShort(todaySummary.payments)}
+            </Text>
+          </View>
+        </View>
+
+        {/* Top debtors */}
+        <View style={styles.section}>
+          <View style={styles.sectionHeader}>
+            <Text style={[styles.sectionTitle, typography.headingMedium]}>Top Debtors</Text>
+            <View style={styles.sectionAccent} />
+          </View>
+
+          {topDebtors.length === 0 ? (
+            <EmptyState
+              icon="people-outline"
+              title="No debtors yet"
+              subtitle="Add customers and record credit transactions"
+            />
+          ) : (
+            <View style={styles.debtorList}>
+              {topDebtors.map((item) => (
+                <View key={item.id}>{renderDebtor({ item })}</View>
+              ))}
+            </View>
+          )}
+        </View>
+      </ScrollView>
 
       {/* FAB */}
-      <TouchableOpacity
+      <Pressable
         style={styles.fab}
-        onPress={() => navigation.navigate('Customers', { screen: 'AddTransaction', params: {} })}
+        onPress={() => navigation.navigate('Home', { screen: 'AddTransaction' })}
+        android_ripple={{ color: 'rgba(255,255,255,0.2)' }}
       >
-        <Ionicons name="add" size={28} color={COLORS.white} />
-      </TouchableOpacity>
+        <Ionicons name="add" size={28} color={COLORS.navy} />
+      </Pressable>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: COLORS.background },
-  outstandingCard: {
-    backgroundColor: COLORS.primary,
-    margin: 16,
-    borderRadius: 16,
-    padding: 24,
+  root: { flex: 1, backgroundColor: COLORS.cream },
+  header: {
+    backgroundColor: COLORS.navy,
+    flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingTop: 56,
+    paddingBottom: 20,
+    paddingHorizontal: spacing.lg,
   },
-  outstandingLabel: { color: 'rgba(255,255,255,0.8)', fontSize: FONT_SIZES.md },
-  outstandingAmount: { color: COLORS.white, fontSize: FONT_SIZES.xxxl, fontWeight: 'bold', marginTop: 4 },
-  summaryRow: { flexDirection: 'row', marginHorizontal: 16, gap: 12, marginBottom: 8 },
-  summaryCard: {
+  headerGreet: { color: COLORS.textMuted },
+  headerTitle: { color: COLORS.white },
+  headerIcon: {
+    width: 46,
+    height: 46,
+    borderRadius: 23,
+    backgroundColor: 'rgba(232,160,32,0.15)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  scroll: { flex: 1 },
+  scrollContent: { padding: spacing.lg, paddingBottom: 100 },
+  heroCard: {
+    backgroundColor: COLORS.navy,
+    borderRadius: radius.xl,
+    padding: spacing.xxl,
+    alignItems: 'center',
+    marginBottom: spacing.lg,
+    ...shadows.lg,
+  },
+  heroLabel: { color: COLORS.textMuted, letterSpacing: 1.2, marginBottom: spacing.sm },
+  heroAmount: { color: COLORS.coral, marginBottom: spacing.xs },
+  heroSub: { color: COLORS.textSecondary },
+  statRow: { flexDirection: 'row', gap: spacing.md, marginBottom: spacing.xl },
+  statCard: {
     flex: 1,
-    backgroundColor: COLORS.white,
-    borderRadius: 12,
-    padding: 14,
-    borderLeftWidth: 4,
-    elevation: 1,
+    backgroundColor: COLORS.surface,
+    borderRadius: radius.lg,
+    padding: spacing.lg,
+    alignItems: 'flex-start',
+    ...shadows.sm,
   },
-  summaryLabel: { color: COLORS.textLight, fontSize: FONT_SIZES.xs, marginBottom: 4 },
-  summaryAmount: { fontSize: FONT_SIZES.lg, fontWeight: '700' },
-  sectionTitle: {
-    fontSize: FONT_SIZES.md,
-    fontWeight: '600',
-    color: COLORS.textLight,
-    marginHorizontal: 16,
-    marginTop: 16,
-    marginBottom: 8,
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
+  statCardCredit: { borderLeftWidth: 3, borderLeftColor: COLORS.coral },
+  statCardPayment: { borderLeftWidth: 3, borderLeftColor: COLORS.emerald },
+  statLabel: { color: COLORS.textSecondary, letterSpacing: 0.5, marginVertical: spacing.xs },
+  statAmount: {},
+  section: { marginBottom: spacing.xxl },
+  sectionHeader: { marginBottom: spacing.md },
+  sectionTitle: { color: COLORS.textPrimary, marginBottom: 4 },
+  sectionAccent: { width: 36, height: 3, backgroundColor: COLORS.gold, borderRadius: 2 },
+  debtorList: {
+    backgroundColor: COLORS.surface,
+    borderRadius: radius.lg,
+    overflow: 'hidden',
+    ...shadows.sm,
   },
   debtorRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: COLORS.white,
-    marginHorizontal: 16,
-    marginBottom: 8,
-    borderRadius: 12,
-    padding: 14,
-    elevation: 1,
+    padding: spacing.lg,
+    borderBottomWidth: 1,
+    borderBottomColor: COLORS.border,
   },
-  avatar: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    backgroundColor: COLORS.primary,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: 12,
-  },
-  avatarText: { color: COLORS.white, fontWeight: '700', fontSize: FONT_SIZES.md },
-  debtorInfo: { flex: 1 },
-  debtorName: { fontSize: FONT_SIZES.md, fontWeight: '600', color: COLORS.text },
-  debtorSub: { fontSize: FONT_SIZES.xs, color: COLORS.textLight, marginTop: 2 },
-  debtorBalance: { fontSize: FONT_SIZES.lg, fontWeight: '700', color: COLORS.danger },
-  emptyState: { alignItems: 'center', paddingVertical: 60, paddingHorizontal: 32 },
-  emptyText: { fontSize: FONT_SIZES.lg, fontWeight: '600', color: COLORS.textLight, marginTop: 16 },
-  emptySubtext: { fontSize: FONT_SIZES.sm, color: COLORS.textLight, textAlign: 'center', marginTop: 8 },
+  debtorInfo: { flex: 1, marginLeft: spacing.md },
+  debtorName: { color: COLORS.textPrimary },
+  debtorPhone: { color: COLORS.textSecondary, marginTop: 2 },
+  debtorAmountWrap: { alignItems: 'flex-end' },
+  debtorAmount: { color: COLORS.coral },
+  owedLabel: { color: COLORS.textMuted, letterSpacing: 0.5, marginTop: 2 },
   fab: {
     position: 'absolute',
-    bottom: 24,
-    right: 24,
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    backgroundColor: COLORS.primary,
+    right: spacing.lg,
+    bottom: 28,
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    backgroundColor: COLORS.gold,
     alignItems: 'center',
     justifyContent: 'center',
-    elevation: 6,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.3,
-    shadowRadius: 4,
+    ...shadows.gold,
   },
 });

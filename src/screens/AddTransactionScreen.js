@@ -1,192 +1,253 @@
 import React, { useState, useEffect } from 'react';
 import {
-  View, Text, StyleSheet, TextInput, TouchableOpacity,
-  ScrollView, Alert, KeyboardAvoidingView, Platform,
+  View, Text, TextInput, StyleSheet, ScrollView,
+  Pressable, Alert, StatusBar,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { COLORS, FONT_SIZES } from '../utils/constants';
-import { formatKES } from '../utils/formatters';
-import { addTransaction } from '../db/transactions';
 import { getAllCustomers } from '../db/customers';
+import { addTransaction } from '../db/transactions';
+import { COLORS } from '../theme/colors';
+import { typography } from '../theme/typography';
+import { spacing, radius } from '../theme/spacing';
+import { shadows } from '../theme/shadows';
+import DukaButton from '../components/DukaButton';
 
-export default function AddTransactionScreen({ route, navigation }) {
-  const { customerId, customerName, defaultType } = route.params || {};
+export default function AddTransactionScreen({ navigation, route }) {
+  const prefilledCustomerId = route.params?.customerId;
+  const prefilledCustomerName = route.params?.customerName;
 
-  const [type, setType] = useState(defaultType || 'credit');
+  const [type, setType] = useState('credit');
   const [amount, setAmount] = useState('');
   const [description, setDescription] = useState('');
   const [note, setNote] = useState('');
-  const [selectedCustomerId, setSelectedCustomerId] = useState(customerId || null);
-  const [selectedCustomerName, setSelectedCustomerName] = useState(customerName || '');
+  const [customerId, setCustomerId] = useState(prefilledCustomerId || null);
+  const [customerName, setCustomerName] = useState(prefilledCustomerName || '');
   const [customers, setCustomers] = useState([]);
-  const [showPicker, setShowPicker] = useState(!customerId);
-  const [customerSearch, setCustomerSearch] = useState('');
+  const [showPicker, setShowPicker] = useState(false);
+  const [saving, setSaving] = useState(false);
 
   useEffect(() => {
-    const data = getAllCustomers();
-    setCustomers(data);
+    setCustomers(getAllCustomers());
   }, []);
 
-  const parsedAmount = parseFloat(amount.replace(/,/g, '')) || 0;
+  const handleSave = () => {
+    if (!customerId) return Alert.alert('Error', 'Please select a customer');
+    const amt = parseFloat(amount);
+    if (!amt || amt <= 0) return Alert.alert('Error', 'Please enter a valid amount');
 
-  const filteredCustomers = customers.filter((c) => {
-    const q = customerSearch.toLowerCase();
-    return c.name.toLowerCase().includes(q) || (c.phone && c.phone.includes(q));
-  });
-
-  const handleConfirm = () => {
-    if (!selectedCustomerId) {
-      Alert.alert('Select Customer', 'Please select a customer first.');
-      return;
-    }
-    if (parsedAmount <= 0) {
-      Alert.alert('Invalid Amount', 'Please enter a valid amount greater than 0.');
-      return;
-    }
-
+    setSaving(true);
     try {
-      addTransaction(selectedCustomerId, type, parsedAmount, description.trim(), note.trim());
+      addTransaction(customerId, type, amt, description.trim(), note.trim(), '');
       navigation.goBack();
     } catch (e) {
-      Alert.alert('Error', 'Failed to save transaction. Please try again.');
-      console.error(e);
+      Alert.alert('Error', 'Failed to save transaction');
+      setSaving(false);
     }
   };
 
+  const isCredit = type === 'credit';
+
   return (
-    <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-      <ScrollView style={styles.container} keyboardShouldPersistTaps="handled">
+    <View style={styles.root}>
+      <StatusBar barStyle="light-content" backgroundColor={COLORS.navy} />
+
+      {/* Header */}
+      <View style={styles.header}>
+        <Pressable onPress={() => navigation.goBack()} style={styles.backBtn}>
+          <Ionicons name="arrow-back" size={24} color={COLORS.white} />
+        </Pressable>
+        <Text style={[styles.headerTitle, typography.headingLarge]}>New Transaction</Text>
+      </View>
+
+      <ScrollView style={styles.scroll} contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled">
 
         {/* Type toggle */}
-        <View style={styles.toggle}>
-          <TouchableOpacity
-            style={[styles.toggleBtn, type === 'credit' && { backgroundColor: COLORS.danger }]}
+        <View style={styles.toggleWrap}>
+          <Pressable
+            style={[styles.toggleBtn, isCredit && styles.toggleActive, isCredit && { backgroundColor: COLORS.coral }]}
             onPress={() => setType('credit')}
           >
-            <Ionicons name="arrow-up-circle" size={18} color={type === 'credit' ? COLORS.white : COLORS.textLight} />
-            <Text style={[styles.toggleText, type === 'credit' && { color: COLORS.white }]}>Credit</Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[styles.toggleBtn, type === 'payment' && { backgroundColor: COLORS.accent }]}
+            <Ionicons name="arrow-up-circle-outline" size={18} color={isCredit ? COLORS.white : COLORS.textSecondary} />
+            <Text style={[styles.toggleLabel, typography.labelLarge, { color: isCredit ? COLORS.white : COLORS.textSecondary }]}>
+              Credit
+            </Text>
+          </Pressable>
+          <Pressable
+            style={[styles.toggleBtn, !isCredit && styles.toggleActive, !isCredit && { backgroundColor: COLORS.emerald }]}
             onPress={() => setType('payment')}
           >
-            <Ionicons name="arrow-down-circle" size={18} color={type === 'payment' ? COLORS.white : COLORS.textLight} />
-            <Text style={[styles.toggleText, type === 'payment' && { color: COLORS.white }]}>Payment</Text>
-          </TouchableOpacity>
+            <Ionicons name="arrow-down-circle-outline" size={18} color={!isCredit ? COLORS.white : COLORS.textSecondary} />
+            <Text style={[styles.toggleLabel, typography.labelLarge, { color: !isCredit ? COLORS.white : COLORS.textSecondary }]}>
+              Payment
+            </Text>
+          </Pressable>
         </View>
 
-        {/* Customer selector */}
+        {/* Amount input */}
+        <View style={styles.amountSection}>
+          <Text style={[styles.amountLabel, typography.labelMedium]}>AMOUNT (KES)</Text>
+          <TextInput
+            style={[styles.amountInput, typography.amountHero, { color: isCredit ? COLORS.coral : COLORS.emerald }]}
+            value={amount}
+            onChangeText={setAmount}
+            keyboardType="decimal-pad"
+            placeholder="0.00"
+            placeholderTextColor={COLORS.textMuted}
+          />
+        </View>
+
+        {/* Customer picker */}
         <View style={styles.section}>
-          <Text style={styles.label}>Customer</Text>
-          {selectedCustomerId && !showPicker ? (
-            <TouchableOpacity style={styles.customerSelected} onPress={() => setShowPicker(true)}>
-              <Text style={styles.customerSelectedName}>{selectedCustomerName}</Text>
-              <Text style={styles.changeText}>Change</Text>
-            </TouchableOpacity>
-          ) : (
-            <View style={styles.pickerContainer}>
-              <View style={styles.searchBar}>
-                <Ionicons name="search" size={16} color={COLORS.textLight} />
-                <TextInput
-                  style={styles.searchInput}
-                  placeholder="Search customer..."
-                  value={customerSearch}
-                  onChangeText={setCustomerSearch}
-                  placeholderTextColor={COLORS.textLight}
-                />
-              </View>
-              {filteredCustomers.slice(0, 6).map((c) => (
-                <TouchableOpacity
+          <Text style={[styles.fieldLabel, typography.labelMedium]}>CUSTOMER</Text>
+          <Pressable style={styles.pickerBtn} onPress={() => setShowPicker(!showPicker)}>
+            <Ionicons name="person-outline" size={18} color={COLORS.textSecondary} />
+            <Text style={[styles.pickerText, typography.bodyMedium, !customerName && { color: COLORS.textMuted }]}>
+              {customerName || 'Select customer…'}
+            </Text>
+            <Ionicons name={showPicker ? 'chevron-up' : 'chevron-down'} size={18} color={COLORS.textSecondary} />
+          </Pressable>
+          {showPicker && (
+            <View style={styles.dropdownList}>
+              {customers.map((c) => (
+                <Pressable
                   key={c.id}
-                  style={styles.customerOption}
+                  style={styles.dropdownItem}
                   onPress={() => {
-                    setSelectedCustomerId(c.id);
-                    setSelectedCustomerName(c.name);
+                    setCustomerId(c.id);
+                    setCustomerName(c.name);
                     setShowPicker(false);
                   }}
                 >
-                  <Text style={styles.customerOptionName}>{c.name}</Text>
-                  <Text style={styles.customerOptionBalance}>{formatKES(c.balance)}</Text>
-                </TouchableOpacity>
+                  <Text style={[styles.dropdownText, typography.bodyMedium]}>{c.name}</Text>
+                </Pressable>
               ))}
             </View>
           )}
         </View>
 
-        {/* Amount */}
-        <View style={styles.section}>
-          <Text style={styles.label}>Amount (KES)</Text>
-          <TextInput
-            style={styles.amountInput}
-            placeholder="0.00"
-            value={amount}
-            onChangeText={setAmount}
-            keyboardType="decimal-pad"
-            placeholderTextColor={COLORS.textLight}
-          />
-          {parsedAmount > 0 && (
-            <Text style={styles.amountPreview}>{formatKES(parsedAmount)}</Text>
-          )}
-        </View>
-
         {/* Description */}
         <View style={styles.section}>
-          <Text style={styles.label}>Description (optional)</Text>
+          <Text style={[styles.fieldLabel, typography.labelMedium]}>DESCRIPTION</Text>
           <TextInput
-            style={styles.input}
-            placeholder="e.g. Unga, Sugar, Cooking oil..."
+            style={[styles.textInput, typography.bodyMedium]}
             value={description}
             onChangeText={setDescription}
-            placeholderTextColor={COLORS.textLight}
+            placeholder="e.g. Groceries, Airtime…"
+            placeholderTextColor={COLORS.textMuted}
           />
         </View>
 
         {/* Note */}
         <View style={styles.section}>
-          <Text style={styles.label}>Note (optional)</Text>
+          <Text style={[styles.fieldLabel, typography.labelMedium]}>NOTE (optional)</Text>
           <TextInput
-            style={[styles.input, { height: 72 }]}
-            placeholder="Any extra notes..."
+            style={[styles.textInput, styles.noteInput, typography.bodyMedium]}
             value={note}
             onChangeText={setNote}
+            placeholder="Any additional notes…"
+            placeholderTextColor={COLORS.textMuted}
             multiline
-            placeholderTextColor={COLORS.textLight}
+            numberOfLines={3}
           />
         </View>
 
-        {/* Confirm button */}
-        <TouchableOpacity
-          style={[styles.confirmBtn, { backgroundColor: type === 'credit' ? COLORS.danger : COLORS.accent }]}
-          onPress={handleConfirm}
-        >
-          <Text style={styles.confirmBtnText}>
-            {type === 'credit' ? 'Record Credit' : 'Record Payment'}
-          </Text>
-        </TouchableOpacity>
+        <DukaButton
+          label="Confirm Transaction"
+          onPress={handleSave}
+          loading={saving}
+          style={styles.saveBtn}
+        />
       </ScrollView>
-    </KeyboardAvoidingView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: COLORS.background },
-  toggle: { flexDirection: 'row', margin: 16, backgroundColor: COLORS.white, borderRadius: 12, padding: 4, elevation: 1 },
-  toggleBtn: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', paddingVertical: 12, borderRadius: 10, gap: 6 },
-  toggleText: { fontSize: FONT_SIZES.md, fontWeight: '600', color: COLORS.textLight },
-  section: { marginHorizontal: 16, marginBottom: 16 },
-  label: { fontSize: FONT_SIZES.sm, fontWeight: '600', color: COLORS.textLight, marginBottom: 8, textTransform: 'uppercase', letterSpacing: 0.3 },
-  customerSelected: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', backgroundColor: COLORS.white, borderRadius: 10, padding: 14, elevation: 1 },
-  customerSelectedName: { fontSize: FONT_SIZES.md, fontWeight: '600', color: COLORS.text },
-  changeText: { fontSize: FONT_SIZES.sm, color: COLORS.primary, fontWeight: '600' },
-  pickerContainer: { backgroundColor: COLORS.white, borderRadius: 10, elevation: 1, overflow: 'hidden' },
-  searchBar: { flexDirection: 'row', alignItems: 'center', padding: 10, borderBottomWidth: 1, borderBottomColor: COLORS.border, gap: 8 },
-  searchInput: { flex: 1, fontSize: FONT_SIZES.md, color: COLORS.text },
-  customerOption: { flexDirection: 'row', justifyContent: 'space-between', padding: 14, borderBottomWidth: 1, borderBottomColor: COLORS.border },
-  customerOptionName: { fontSize: FONT_SIZES.md, color: COLORS.text },
-  customerOptionBalance: { fontSize: FONT_SIZES.sm, color: COLORS.textLight },
-  amountInput: { backgroundColor: COLORS.white, borderRadius: 10, padding: 16, fontSize: FONT_SIZES.xxl, fontWeight: 'bold', color: COLORS.text, elevation: 1, textAlign: 'center' },
-  amountPreview: { textAlign: 'center', marginTop: 6, fontSize: FONT_SIZES.sm, color: COLORS.textLight },
-  input: { backgroundColor: COLORS.white, borderRadius: 10, padding: 14, fontSize: FONT_SIZES.md, color: COLORS.text, elevation: 1 },
-  confirmBtn: { margin: 16, marginTop: 8, padding: 18, borderRadius: 14, alignItems: 'center', elevation: 2 },
-  confirmBtnText: { color: COLORS.white, fontSize: FONT_SIZES.lg, fontWeight: '700' },
+  root: { flex: 1, backgroundColor: COLORS.cream },
+  header: {
+    backgroundColor: COLORS.navy,
+    paddingTop: 52,
+    paddingBottom: 20,
+    paddingHorizontal: spacing.lg,
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  backBtn: { marginRight: spacing.md },
+  headerTitle: { color: COLORS.white },
+  scroll: { flex: 1 },
+  scrollContent: { padding: spacing.lg },
+  toggleWrap: {
+    flexDirection: 'row',
+    backgroundColor: COLORS.surface,
+    borderRadius: radius.xl,
+    padding: 4,
+    marginBottom: spacing.xl,
+    ...shadows.sm,
+  },
+  toggleBtn: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: spacing.md,
+    borderRadius: radius.lg,
+    gap: spacing.sm,
+  },
+  toggleActive: {},
+  toggleLabel: {},
+  amountSection: {
+    backgroundColor: COLORS.surface,
+    borderRadius: radius.xl,
+    padding: spacing.xl,
+    alignItems: 'center',
+    marginBottom: spacing.xl,
+    ...shadows.md,
+  },
+  amountLabel: {
+    color: COLORS.textSecondary,
+    letterSpacing: 1,
+    marginBottom: spacing.md,
+  },
+  amountInput: {
+    textAlign: 'center',
+    width: '100%',
+  },
+  section: { marginBottom: spacing.lg },
+  fieldLabel: {
+    color: COLORS.textSecondary,
+    letterSpacing: 0.8,
+    marginBottom: spacing.sm,
+  },
+  pickerBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: COLORS.surface,
+    borderRadius: radius.lg,
+    padding: spacing.lg,
+    gap: spacing.sm,
+    ...shadows.sm,
+  },
+  pickerText: { flex: 1, color: COLORS.textPrimary },
+  dropdownList: {
+    backgroundColor: COLORS.surface,
+    borderRadius: radius.lg,
+    marginTop: spacing.xs,
+    ...shadows.md,
+    overflow: 'hidden',
+  },
+  dropdownItem: {
+    padding: spacing.lg,
+    borderBottomWidth: 1,
+    borderBottomColor: COLORS.border,
+  },
+  dropdownText: { color: COLORS.textPrimary },
+  textInput: {
+    backgroundColor: COLORS.surface,
+    borderRadius: radius.lg,
+    padding: spacing.lg,
+    color: COLORS.textPrimary,
+    ...shadows.sm,
+  },
+  noteInput: { minHeight: 80, textAlignVertical: 'top' },
+  saveBtn: { marginTop: spacing.md },
 });

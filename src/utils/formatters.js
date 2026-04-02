@@ -27,6 +27,13 @@ export function formatRelativeDate(isoString) {
   return formatDate(isoString);
 }
 
+export function formatKESShort(amount) {
+  const num = parseFloat(amount) || 0;
+  if (num >= 1000000) return 'KES ' + (num / 1000000).toFixed(1) + 'M';
+  if (num >= 1000) return 'KES ' + (num / 1000).toFixed(1) + 'K';
+  return 'KES ' + num.toFixed(0);
+}
+
 export function getInitials(name) {
   if (!name) return '?';
   return name

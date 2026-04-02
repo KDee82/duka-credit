@@ -3,13 +3,16 @@ import { View, Text, StyleSheet, ActivityIndicator } from 'react-native';
 import { NavigationContainer } from '@react-navigation/native';
 import { StatusBar } from 'expo-status-bar';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
+import { useFonts } from 'expo-font';
 import AppNavigator from './src/navigation/AppNavigator';
 import { initDB } from './src/db/database';
-import { COLORS, FONT_SIZES } from './src/utils/constants';
+import { COLORS } from './src/utils/constants';
+import { fonts } from './src/theme/typography';
 
 export default function App() {
   const [dbReady, setDbReady] = useState(false);
   const [error, setError] = useState(null);
+  const [fontsLoaded] = useFonts(fonts);
 
   useEffect(() => {
     initDB()
@@ -23,14 +26,14 @@ export default function App() {
   if (error) {
     return (
       <View style={styles.loading}>
-        <Text style={{ color: COLORS.danger, fontSize: FONT_SIZES.md }}>
+        <Text style={{ color: COLORS.danger, fontSize: 15 }}>
           Failed to initialise database: {error}
         </Text>
       </View>
     );
   }
 
-  if (!dbReady) {
+  if (!dbReady || !fontsLoaded) {
     return (
       <View style={styles.loading}>
         <ActivityIndicator size="large" color={COLORS.primary} />
@@ -58,7 +61,7 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   loadingText: {
-    fontSize: FONT_SIZES.md,
-    color: COLORS.textLight,
+    fontSize: 15,
+    color: COLORS.textSecondary,
   },
 });

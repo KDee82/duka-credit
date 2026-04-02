@@ -1,141 +1,228 @@
 import React, { useState, useCallback } from 'react';
 import {
-  View, Text, StyleSheet, FlatList, TouchableOpacity,
-  Alert, RefreshControl,
+  View, Text, FlatList, StyleSheet, Pressable,
+  Alert, StatusBar,
 } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
-import { COLORS, FONT_SIZES } from '../utils/constants';
-import { formatKES, formatDate } from '../utils/formatters';
 import { getCustomerById } from '../db/customers';
 import { getTransactionsByCustomer, voidTransaction } from '../db/transactions';
+import { COLORS } from '../theme/colors';
+import { typography } from '../theme/typography';
+import { spacing, radius } from '../theme/spacing';
+import { shadows } from '../theme/shadows';
+import { formatKES, formatDate, formatRelativeDate } from '../utils/formatters';
+import DukaAvatar from '../components/DukaAvatar';
+import EmptyState from '../components/EmptyState';
 
 export default function CustomerDetailScreen({ route, navigation }) {
-  const { customerId } = route.params;
+  const { customerId, customerName } = route.params;
   const [customer, setCustomer] = useState(null);
   const [transactions, setTransactions] = useState([]);
-  const [refreshing, setRefreshing] = useState(false);
 
-  const load = useCallback(() => {
-    try {
+  useFocusEffect(
+    useCallback(() => {
       const c = getCustomerById(customerId);
       setCustomer(c);
       setTransactions(getTransactionsByCustomer(customerId));
-      if (c) navigation.setOptions({ title: c.name });
-    } catch (e) {
-      console.error('CustomerDetail load error:', e);
-    }
-  }, [customerId, navigation]);
+    }, [customerId])
+  );
 
-  useFocusEffect(useCallback(() => { load(); }, [load]));
+  const handleVoid = (txId) => {
+    Alert.alert('Void Transaction', 'Are you sure you want to void this transaction?', [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Void',
+        style: 'destructive',
+        onPress: () => {
+          voidTransaction(txId);
+          setTransactions(getTransactionsByCustomer(customerId));
+          const c = getCustomerById(customerId);
+          setCustomer(c);
+        },
+      },
+    ]);
+  };
 
-  const onRefresh = () => { setRefreshing(true); load(); setRefreshing(false); };
+  const balance = customer?.balance ?? 0;
+  const isSettled = balance <= 0;
 
-  const handleVoid = (txn) => {
-    if (txn.is_voided) return;
-    Alert.alert(
-      'Void Transaction',
-      `Void this ${txn.type} of ${formatKES(txn.amount)}? This cannot be undone.`,
-      [
-        { text: 'Cancel', style: 'cancel' },
-        { text: 'Void', style: 'destructive', onPress: () => { voidTransaction(txn.id); load(); } },
-      ]
+  const renderTransaction = ({ item }) => {
+    const isCredit = item.type === 'credit';
+    return (
+      <Pressable
+        style={[styles.txRow, item.is_voided && styles.txVoided]}
+        onLongPress={() => !item.is_voided && handleVoid(item.id)}
+        android_ripple={{ color: 'rgba(15,31,61,0.05)' }}
+      >
+        <View style={[styles.txAccent, { backgroundColor: isCredit ? COLORS.coral : COLORS.emerald }]} />
+        <View style={styles.txBody}>
+          <View style={styles.txTop}>
+            <Text style={[styles.txDesc, typography.headingSmall, item.is_voided && styles.txVoidedText]}>
+              {item.description || (isCredit ? 'Credit' : 'Payment')}
+            </Text>
+            <Text style={[
+              styles.txAmount,
+              typography.amountMedium,
+              { color: isCredit ? COLORS.coral : COLORS.emerald },
+              item.is_voided && styles.txVoidedText,
+            ]}>
+              {isCredit ? '+' : '-'}{formatKES(item.amount)}
+            </Text>
+          </View>
+          <View style={styles.txBottom}>
+            <Text style={[styles.txDate, typography.bodySmall]}>{formatRelativeDate(item.created_at)}</Text>
+            {item.is_voided && (
+              <View style={styles.voidedBadge}>
+                <Text style={[styles.voidedText, typography.labelSmall]}>VOIDED</Text>
+              </View>
+            )}
+          </View>
+        </View>
+      </Pressable>
     );
   };
 
-  if (!customer) return null;
-
-  const balance = customer.balance || 0;
-
   return (
-    <View style={styles.container}>
-      <View style={[styles.header, { backgroundColor: balance > 0 ? COLORS.primary : COLORS.accent }]}>
-        <Text style={styles.headerLabel}>Current Balance</Text>
-        <Text style={styles.headerBalance}>{formatKES(balance)}</Text>
-        {customer.phone ? <Text style={styles.headerPhone}>{customer.phone}</Text> : null}
+    <View style={styles.root}>
+      <StatusBar barStyle="light-content" backgroundColor={COLORS.navy} />
+
+      {/* Navy header */}
+      <View style={styles.header}>
+        <Pressable onPress={() => navigation.goBack()} style={styles.backBtn}>
+          <Ionicons name="arrow-back" size={24} color={COLORS.white} />
+        </Pressable>
+        <View style={styles.headerContent}>
+          <DukaAvatar name={customerName} size="lg" />
+          <Text style={[styles.customerName, typography.headingLarge]}>{customerName}</Text>
+          {customer?.phone ? (
+            <Text style={[styles.customerPhone, typography.bodyMedium]}>{customer.phone}</Text>
+          ) : null}
+        </View>
       </View>
 
-      <View style={styles.actions}>
-        <TouchableOpacity
-          style={[styles.actionBtn, { backgroundColor: COLORS.danger }]}
-          onPress={() => navigation.navigate('AddTransaction', { customerId, customerName: customer.name, defaultType: 'credit' })}
-        >
-          <Ionicons name="arrow-up-circle" size={20} color={COLORS.white} />
-          <Text style={styles.actionBtnText}>Credit</Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={[styles.actionBtn, { backgroundColor: COLORS.accent }]}
-          onPress={() => navigation.navigate('AddTransaction', { customerId, customerName: customer.name, defaultType: 'payment' })}
-        >
-          <Ionicons name="arrow-down-circle" size={20} color={COLORS.white} />
-          <Text style={styles.actionBtnText}>Payment</Text>
-        </TouchableOpacity>
+      {/* Balance card */}
+      <View style={styles.balanceCard}>
+        <Text style={[styles.balanceLabel, typography.labelMedium]}>CURRENT BALANCE</Text>
+        <Text style={[styles.balanceAmount, typography.amountHero, { color: isSettled ? COLORS.emerald : COLORS.coral }]}>
+          {formatKES(Math.abs(balance))}
+        </Text>
+        <View style={[styles.statusBadge, { backgroundColor: isSettled ? COLORS.emeraldLight : COLORS.coralLight }]}>
+          <Text style={[styles.statusText, typography.labelSmall, { color: isSettled ? COLORS.emerald : COLORS.coral }]}>
+            {isSettled ? '✓ SETTLED' : 'OWES'}
+          </Text>
+        </View>
       </View>
 
-      <Text style={styles.historyLabel}>Transaction History</Text>
+      {/* Transaction list */}
+      <View style={styles.listHeader}>
+        <Text style={[styles.listTitle, typography.headingMedium]}>Transactions</Text>
+        <View style={styles.listAccent} />
+      </View>
 
       <FlatList
         data={transactions}
         keyExtractor={(item) => String(item.id)}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
-        contentContainerStyle={{ paddingBottom: 32 }}
-        renderItem={({ item }) => (
-          <TouchableOpacity
-            style={[styles.txnRow, item.is_voided && styles.txnVoided]}
-            onLongPress={() => handleVoid(item)}
-            activeOpacity={0.8}
-          >
-            <View style={[styles.txnIcon, { backgroundColor: item.type === 'credit' ? '#FDECEA' : '#EAF7EE' }]}>
-              <Ionicons
-                name={item.type === 'credit' ? 'arrow-up' : 'arrow-down'}
-                size={18}
-                color={item.type === 'credit' ? COLORS.danger : COLORS.accent}
-              />
-            </View>
-            <View style={styles.txnInfo}>
-              <Text style={[styles.txnType, item.is_voided && styles.strikethrough]}>
-                {item.type === 'credit' ? 'Credit Given' : 'Payment Received'}
-              </Text>
-              {item.description ? <Text style={styles.txnDesc}>{item.description}</Text> : null}
-              <Text style={styles.txnDate}>{formatDate(item.created_at)}</Text>
-              {item.is_voided ? <Text style={styles.voidedBadge}>VOIDED</Text> : null}
-            </View>
-            <Text style={[styles.txnAmount, item.is_voided && styles.strikethrough, { color: item.type === 'credit' ? COLORS.danger : COLORS.accent }]}>
-              {item.type === 'credit' ? '+' : '-'}{formatKES(item.amount)}
-            </Text>
-          </TouchableOpacity>
-        )}
+        renderItem={renderTransaction}
+        contentContainerStyle={[styles.listContent, transactions.length === 0 && { flex: 1 }]}
+        ItemSeparatorComponent={() => <View style={styles.separator} />}
         ListEmptyComponent={
-          <View style={styles.empty}>
-            <Ionicons name="receipt-outline" size={50} color={COLORS.border} />
-            <Text style={styles.emptyText}>No transactions yet</Text>
-          </View>
+          <EmptyState
+            icon="receipt-outline"
+            title="No transactions yet"
+            subtitle="Tap the button below to record a credit or payment"
+          />
         }
       />
+
+      {/* FAB */}
+      <Pressable
+        style={styles.fab}
+        onPress={() => navigation.navigate('AddTransaction', { customerId, customerName })}
+        android_ripple={{ color: 'rgba(255,255,255,0.2)' }}
+      >
+        <Ionicons name="add" size={22} color={COLORS.navy} />
+        <Text style={[styles.fabText, typography.labelLarge]}>Add Transaction</Text>
+      </Pressable>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: COLORS.background },
-  header: { padding: 24, alignItems: 'center' },
-  headerLabel: { color: 'rgba(255,255,255,0.8)', fontSize: FONT_SIZES.sm },
-  headerBalance: { color: COLORS.white, fontSize: FONT_SIZES.xxxl, fontWeight: 'bold', marginTop: 4 },
-  headerPhone: { color: 'rgba(255,255,255,0.7)', fontSize: FONT_SIZES.sm, marginTop: 6 },
-  actions: { flexDirection: 'row', margin: 16, gap: 12 },
-  actionBtn: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', padding: 14, borderRadius: 12, gap: 8 },
-  actionBtnText: { color: COLORS.white, fontWeight: '700', fontSize: FONT_SIZES.md },
-  historyLabel: { fontSize: FONT_SIZES.sm, fontWeight: '600', color: COLORS.textLight, marginHorizontal: 16, marginBottom: 8, textTransform: 'uppercase', letterSpacing: 0.5 },
-  txnRow: { flexDirection: 'row', alignItems: 'center', backgroundColor: COLORS.white, marginHorizontal: 16, marginBottom: 8, borderRadius: 12, padding: 14, elevation: 1 },
-  txnVoided: { opacity: 0.5 },
-  txnIcon: { width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center', marginRight: 12 },
-  txnInfo: { flex: 1 },
-  txnType: { fontSize: FONT_SIZES.md, fontWeight: '600', color: COLORS.text },
-  txnDesc: { fontSize: FONT_SIZES.xs, color: COLORS.textLight, marginTop: 2 },
-  txnDate: { fontSize: FONT_SIZES.xs, color: COLORS.textLight, marginTop: 2 },
-  txnAmount: { fontSize: FONT_SIZES.md, fontWeight: '700' },
-  strikethrough: { textDecorationLine: 'line-through' },
-  voidedBadge: { fontSize: FONT_SIZES.xs, color: COLORS.danger, fontWeight: '700', marginTop: 2, letterSpacing: 0.5 },
-  empty: { alignItems: 'center', paddingVertical: 40 },
-  emptyText: { fontSize: FONT_SIZES.md, color: COLORS.textLight, marginTop: 12 },
+  root: { flex: 1, backgroundColor: COLORS.cream },
+  header: {
+    backgroundColor: COLORS.navy,
+    paddingTop: 52,
+    paddingBottom: 24,
+    paddingHorizontal: spacing.lg,
+  },
+  backBtn: { marginBottom: spacing.md },
+  headerContent: { alignItems: 'center' },
+  customerName: { color: COLORS.white, marginTop: spacing.md },
+  customerPhone: { color: COLORS.textMuted, marginTop: 4 },
+  balanceCard: {
+    backgroundColor: COLORS.surface,
+    margin: spacing.lg,
+    borderRadius: radius.xl,
+    padding: spacing.xxl,
+    alignItems: 'center',
+    ...shadows.md,
+  },
+  balanceLabel: {
+    color: COLORS.textSecondary,
+    letterSpacing: 1,
+    marginBottom: spacing.sm,
+  },
+  balanceAmount: { marginBottom: spacing.md },
+  statusBadge: {
+    borderRadius: radius.full,
+    paddingVertical: 4,
+    paddingHorizontal: spacing.lg,
+  },
+  statusText: { letterSpacing: 0.5 },
+  listHeader: {
+    paddingHorizontal: spacing.lg,
+    marginBottom: spacing.md,
+  },
+  listTitle: { color: COLORS.textPrimary, marginBottom: 4 },
+  listAccent: { width: 36, height: 3, backgroundColor: COLORS.gold, borderRadius: 2 },
+  listContent: { paddingHorizontal: spacing.lg, paddingBottom: 100 },
+  txRow: {
+    flexDirection: 'row',
+    backgroundColor: COLORS.surface,
+    borderRadius: radius.md,
+    overflow: 'hidden',
+    ...shadows.sm,
+  },
+  txVoided: { opacity: 0.5 },
+  txAccent: { width: 4 },
+  txBody: { flex: 1, padding: spacing.md },
+  txTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' },
+  txDesc: { flex: 1, color: COLORS.textPrimary, marginRight: spacing.sm },
+  txAmount: {},
+  txVoidedText: { textDecorationLine: 'line-through', color: COLORS.textMuted },
+  txBottom: { flexDirection: 'row', alignItems: 'center', marginTop: spacing.xs },
+  txDate: { color: COLORS.textSecondary, flex: 1 },
+  voidedBadge: {
+    backgroundColor: COLORS.border,
+    borderRadius: radius.sm,
+    paddingVertical: 2,
+    paddingHorizontal: spacing.sm,
+  },
+  voidedText: { color: COLORS.textMuted },
+  separator: { height: spacing.sm },
+  fab: {
+    position: 'absolute',
+    right: spacing.lg,
+    bottom: 24,
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: COLORS.gold,
+    borderRadius: radius.full,
+    paddingVertical: 14,
+    paddingHorizontal: spacing.xl,
+    gap: 8,
+    ...shadows.gold,
+  },
+  fabText: { color: COLORS.navy },
 });

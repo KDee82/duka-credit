@@ -1,175 +1,183 @@
 import React, { useState, useCallback } from 'react';
 import {
-  View, Text, StyleSheet, FlatList, TouchableOpacity, TextInput,
+  View, Text, FlatList, StyleSheet, TextInput,
+  Pressable, StatusBar,
 } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
-import { COLORS, FONT_SIZES } from '../utils/constants';
-import { formatKES, getInitials, formatRelativeDate } from '../utils/formatters';
-import { getAllCustomers } from '../db/customers';
+import { getAllCustomers, searchCustomers } from '../db/customers';
+import { COLORS } from '../theme/colors';
+import { typography } from '../theme/typography';
+import { spacing, radius } from '../theme/spacing';
+import { shadows } from '../theme/shadows';
+import { formatKESShort } from '../utils/formatters';
+import DukaAvatar from '../components/DukaAvatar';
+import EmptyState from '../components/EmptyState';
 
 export default function CustomerListScreen({ navigation }) {
   const [customers, setCustomers] = useState([]);
-  const [search, setSearch] = useState('');
+  const [query, setQuery] = useState('');
 
   useFocusEffect(
     useCallback(() => {
-      const data = getAllCustomers();
-      setCustomers(data);
+      setCustomers(getAllCustomers());
     }, [])
   );
 
-  const filtered = customers.filter((c) => {
-    const q = search.toLowerCase();
+  const filtered = query.trim()
+    ? searchCustomers(query)
+    : customers;
+
+  const renderCustomer = ({ item }) => {
+    const isSettled = item.balance <= 0;
     return (
-      c.name.toLowerCase().includes(q) ||
-      (c.phone && c.phone.includes(q))
+      <Pressable
+        style={styles.customerRow}
+        onPress={() => navigation.navigate('CustomerDetail', {
+          customerId: item.id,
+          customerName: item.name,
+        })}
+        android_ripple={{ color: 'rgba(15,31,61,0.05)' }}
+      >
+        <DukaAvatar name={item.name} size="md" />
+        <View style={styles.customerInfo}>
+          <Text style={[styles.customerName, typography.headingSmall]}>{item.name}</Text>
+          <Text style={[styles.customerPhone, typography.bodySmall]}>{item.phone || 'No phone'}</Text>
+        </View>
+        {isSettled ? (
+          <View style={styles.settledBadge}>
+            <Text style={[styles.settledText, typography.labelSmall]}>SETTLED</Text>
+          </View>
+        ) : (
+          <View style={styles.amountBadge}>
+            <Text style={[styles.amountText, typography.labelMedium]}>{formatKESShort(item.balance)}</Text>
+          </View>
+        )}
+      </Pressable>
     );
-  });
+  };
 
   return (
-    <View style={styles.container}>
-      <View style={styles.searchBar}>
-        <Ionicons name="search" size={18} color={COLORS.textLight} style={{ marginRight: 8 }} />
+    <View style={styles.root}>
+      <StatusBar barStyle="light-content" backgroundColor={COLORS.navy} />
+
+      {/* Header */}
+      <View style={styles.header}>
+        <Text style={[styles.headerTitle, typography.headingLarge]}>Customers</Text>
+        <Text style={[styles.headerCount, typography.bodySmall]}>{customers.length} total</Text>
+      </View>
+
+      {/* Search */}
+      <View style={styles.searchWrap}>
+        <Ionicons name="search" size={18} color={COLORS.textSecondary} style={styles.searchIcon} />
         <TextInput
-          style={styles.searchInput}
-          placeholder="Search by name or phone..."
-          placeholderTextColor={COLORS.textLight}
-          value={search}
-          onChangeText={setSearch}
+          style={[styles.searchInput, typography.bodyMedium]}
+          placeholder="Search by name or phone…"
+          placeholderTextColor={COLORS.textMuted}
+          value={query}
+          onChangeText={setQuery}
         />
-        {search.length > 0 && (
-          <TouchableOpacity onPress={() => setSearch('')}>
-            <Ionicons name="close-circle" size={18} color={COLORS.textLight} />
-          </TouchableOpacity>
+        {query.length > 0 && (
+          <Pressable onPress={() => setQuery('')}>
+            <Ionicons name="close-circle" size={18} color={COLORS.textMuted} />
+          </Pressable>
         )}
       </View>
 
+      {/* List */}
       <FlatList
         data={filtered}
         keyExtractor={(item) => String(item.id)}
-        contentContainerStyle={{ paddingBottom: 80 }}
-        renderItem={({ item }) => (
-          <TouchableOpacity
-            style={styles.customerRow}
-            onPress={() =>
-              navigation.navigate('CustomerDetail', {
-                customerId: item.id,
-                customerName: item.name,
-              })
-            }
-          >
-            <View style={[styles.avatar, item.balance > 0 && { backgroundColor: COLORS.danger }]}>
-              <Text style={styles.avatarText}>{getInitials(item.name)}</Text>
-            </View>
-            <View style={styles.info}>
-              <Text style={styles.name}>{item.name}</Text>
-              <Text style={styles.sub}>
-                {item.phone || 'No phone'} ·{' '}
-                {item.last_transaction_at
-                  ? formatRelativeDate(item.last_transaction_at)
-                  : 'No activity'}
-              </Text>
-            </View>
-            <View style={styles.right}>
-              <Text style={[styles.balance, item.balance > 0 && { color: COLORS.danger }]}>
-                {formatKES(item.balance)}
-              </Text>
-              <Ionicons name="chevron-forward" size={16} color={COLORS.textLight} />
-            </View>
-          </TouchableOpacity>
-        )}
+        renderItem={renderCustomer}
+        contentContainerStyle={[styles.listContent, filtered.length === 0 && { flex: 1 }]}
+        ItemSeparatorComponent={() => <View style={styles.separator} />}
         ListEmptyComponent={
-          <View style={styles.empty}>
-            <Ionicons name="person-add-outline" size={60} color={COLORS.border} />
-            <Text style={styles.emptyText}>
-              {search ? 'No customers match your search' : 'No customers yet'}
-            </Text>
-            {!search && (
-              <TouchableOpacity
-                style={styles.emptyBtn}
-                onPress={() => navigation.navigate('AddCustomer')}
-              >
-                <Text style={styles.emptyBtnText}>Add First Customer</Text>
-              </TouchableOpacity>
-            )}
-          </View>
+          <EmptyState
+            icon="people-outline"
+            title={query ? 'No results found' : 'No customers yet'}
+            subtitle={query ? 'Try a different name or phone number' : 'Tap "Add Customer" to get started'}
+          />
         }
       />
 
       {/* FAB */}
-      <TouchableOpacity
+      <Pressable
         style={styles.fab}
         onPress={() => navigation.navigate('AddCustomer')}
+        android_ripple={{ color: 'rgba(255,255,255,0.2)' }}
       >
-        <Ionicons name="person-add" size={22} color={COLORS.white} />
-      </TouchableOpacity>
+        <Ionicons name="add" size={22} color={COLORS.navy} />
+        <Text style={[styles.fabText, typography.labelLarge]}>Add Customer</Text>
+      </Pressable>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: COLORS.background },
-  searchBar: {
+  root: { flex: 1, backgroundColor: COLORS.cream },
+  header: {
+    backgroundColor: COLORS.navy,
+    paddingTop: 56,
+    paddingBottom: 20,
+    paddingHorizontal: spacing.lg,
+  },
+  headerTitle: { color: COLORS.white },
+  headerCount: { color: COLORS.textMuted, marginTop: 2 },
+  searchWrap: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: COLORS.white,
-    margin: 12,
-    borderRadius: 10,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    elevation: 1,
+    backgroundColor: COLORS.surface,
+    margin: spacing.lg,
+    borderRadius: radius.lg,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    ...shadows.sm,
   },
-  searchInput: { flex: 1, fontSize: FONT_SIZES.md, color: COLORS.text },
+  searchIcon: { marginRight: spacing.sm },
+  searchInput: {
+    flex: 1,
+    color: COLORS.textPrimary,
+    paddingVertical: spacing.xs,
+  },
+  listContent: { paddingHorizontal: spacing.lg, paddingBottom: 100 },
   customerRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: COLORS.white,
-    marginHorizontal: 12,
-    marginBottom: 8,
-    borderRadius: 12,
-    padding: 14,
-    elevation: 1,
+    backgroundColor: COLORS.surface,
+    borderRadius: radius.lg,
+    padding: spacing.lg,
+    ...shadows.sm,
   },
-  avatar: {
-    width: 46,
-    height: 46,
-    borderRadius: 23,
-    backgroundColor: COLORS.primary,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: 12,
+  separator: { height: spacing.sm },
+  customerInfo: { flex: 1, marginLeft: spacing.md },
+  customerName: { color: COLORS.textPrimary },
+  customerPhone: { color: COLORS.textSecondary, marginTop: 2 },
+  amountBadge: {
+    backgroundColor: COLORS.coralLight,
+    borderRadius: radius.full,
+    paddingVertical: 4,
+    paddingHorizontal: spacing.md,
   },
-  avatarText: { color: COLORS.white, fontWeight: '700', fontSize: FONT_SIZES.md },
-  info: { flex: 1 },
-  name: { fontSize: FONT_SIZES.md, fontWeight: '600', color: COLORS.text },
-  sub: { fontSize: FONT_SIZES.xs, color: COLORS.textLight, marginTop: 2 },
-  right: { alignItems: 'flex-end', gap: 4 },
-  balance: { fontSize: FONT_SIZES.md, fontWeight: '700', color: COLORS.text },
-  empty: { alignItems: 'center', paddingVertical: 60, paddingHorizontal: 32 },
-  emptyText: { fontSize: FONT_SIZES.lg, color: COLORS.textLight, marginTop: 16, textAlign: 'center' },
-  emptyBtn: {
-    marginTop: 16,
-    backgroundColor: COLORS.primary,
-    paddingHorizontal: 24,
-    paddingVertical: 12,
-    borderRadius: 8,
+  amountText: { color: COLORS.coral },
+  settledBadge: {
+    backgroundColor: COLORS.emeraldLight,
+    borderRadius: radius.full,
+    paddingVertical: 4,
+    paddingHorizontal: spacing.md,
   },
-  emptyBtnText: { color: COLORS.white, fontWeight: '600', fontSize: FONT_SIZES.md },
+  settledText: { color: COLORS.emerald },
   fab: {
     position: 'absolute',
+    right: spacing.lg,
     bottom: 24,
-    right: 24,
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    backgroundColor: COLORS.primary,
+    flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
-    elevation: 6,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.3,
-    shadowRadius: 4,
+    backgroundColor: COLORS.navy,
+    borderRadius: radius.full,
+    paddingVertical: 14,
+    paddingHorizontal: spacing.xl,
+    gap: 8,
+    ...shadows.lg,
   },
+  fabText: { color: COLORS.white },
 });
