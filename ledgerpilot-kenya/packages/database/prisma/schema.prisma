@@ -1,0 +1,1245 @@
+// LedgerPilot Kenya — Database Schema
+// Multi-tenant white-label accounting platform
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ─────────────────────────────────────────
+// ENUMS
+// ─────────────────────────────────────────
+
+enum FirmRole {
+  FIRM_OWNER
+  FIRM_ADMIN
+  SENIOR_ACCOUNTANT
+  BOOKKEEPER
+  PAYROLL_OFFICER
+  TAX_REVIEWER
+}
+
+enum ClientRole {
+  CLIENT_OWNER
+  CLIENT_FINANCE_STAFF
+  AUDITOR_READONLY
+  EXTERNAL_CONSULTANT
+}
+
+enum CompanyStatus {
+  ACTIVE
+  INACTIVE
+  ARCHIVED
+}
+
+enum VatStatus {
+  REGISTERED
+  NOT_REGISTERED
+  EXEMPT
+}
+
+enum TaxObligation {
+  VAT
+  PAYE
+  NSSF
+  SHIF
+  HOUSING_LEVY
+  WITHHOLDING_TAX
+  TURNOVER_TAX
+  INSTALMENT_TAX
+  INCOME_TAX_RETURN
+  FRINGE_BENEFIT_TAX
+  EXCISE_DUTY
+  DIGITAL_SERVICE_TAX
+}
+
+enum Industry {
+  RETAIL
+  SERVICE
+  SCHOOL
+  CLINIC
+  RESTAURANT
+  CONSTRUCTION
+  PROFESSIONAL_SERVICES
+  NGO
+  ECOMMERCE
+  IMPORT_DISTRIBUTION
+  PROPERTY_MANAGEMENT
+  AGRICULTURE
+  MANUFACTURING
+  OTHER
+}
+
+enum AccountType {
+  ASSET
+  LIABILITY
+  EQUITY
+  INCOME
+  EXPENSE
+  COST_OF_SALES
+}
+
+enum AccountSubType {
+  CURRENT_ASSET
+  NON_CURRENT_ASSET
+  BANK
+  ACCOUNTS_RECEIVABLE
+  INVENTORY
+  PREPAYMENT
+  CURRENT_LIABILITY
+  NON_CURRENT_LIABILITY
+  ACCOUNTS_PAYABLE
+  VAT_LIABILITY
+  PAYE_LIABILITY
+  NSSF_LIABILITY
+  SHIF_LIABILITY
+  HOUSING_LEVY_LIABILITY
+  RETAINED_EARNINGS
+  SHARE_CAPITAL
+  REVENUE
+  OTHER_INCOME
+  DIRECT_COST
+  STAFF_COST
+  OPERATING_EXPENSE
+  DEPRECIATION
+  FINANCE_COST
+  TAX_EXPENSE
+}
+
+enum ContactType {
+  CUSTOMER
+  SUPPLIER
+  BOTH
+}
+
+enum InvoiceStatus {
+  DRAFT
+  SENT
+  PARTIAL
+  PAID
+  OVERDUE
+  VOID
+  CREDIT_NOTE
+}
+
+enum BillStatus {
+  DRAFT
+  PENDING_APPROVAL
+  APPROVED
+  PARTIAL
+  PAID
+  OVERDUE
+  VOID
+}
+
+enum DocumentType {
+  SUPPLIER_INVOICE
+  CUSTOMER_INVOICE
+  RECEIPT
+  DELIVERY_NOTE
+  LPO
+  BANK_STATEMENT
+  MPESA_STATEMENT
+  PAYROLL_SHEET
+  PETTY_CASH
+  IMPORT_DOCUMENT
+  WHT_CERTIFICATE
+  RENT_INVOICE
+  UTILITY_BILL
+  LOAN_STATEMENT
+  ASSET_DOCUMENT
+  INSURANCE
+  STATUTORY_SLIP
+  OTHER
+}
+
+enum DocumentStatus {
+  UPLOADED
+  NEEDS_REVIEW
+  MATCHED
+  POSTED
+  REJECTED
+  DUPLICATE
+  MISSING_DETAILS
+  ETIMS_REQUIRED
+  ARCHIVED
+}
+
+enum EtimsStatus {
+  NOT_STARTED
+  IN_PROGRESS
+  ACTIVE
+  SUSPENDED
+}
+
+enum TransactionType {
+  INVOICE
+  BILL
+  PAYMENT_IN
+  PAYMENT_OUT
+  JOURNAL
+  BANK_TRANSFER
+  OPENING_BALANCE
+  DEPRECIATION
+  PAYROLL
+}
+
+enum ReconciliationStatus {
+  UNRECONCILED
+  MATCHED
+  POSTED
+  EXCLUDED
+}
+
+enum PayrollStatus {
+  DRAFT
+  SUBMITTED
+  APPROVED
+  PROCESSED
+  LOCKED
+}
+
+enum EmploymentType {
+  FULL_TIME
+  PART_TIME
+  CONTRACT
+  CASUAL
+}
+
+enum ObligationStatus {
+  UPCOMING
+  IN_PREPARATION
+  FILED
+  PAID
+  OVERDUE
+  WAIVED
+}
+
+enum CloseStatus {
+  NOT_STARTED
+  IN_PROGRESS
+  WAITING_CLIENT
+  WAITING_REVIEWER
+  COMPLETED
+  LOCKED
+  REOPENED
+}
+
+enum TaskStatus {
+  OPEN
+  IN_PROGRESS
+  WAITING
+  DONE
+  CANCELLED
+}
+
+enum TaskPriority {
+  LOW
+  MEDIUM
+  HIGH
+  URGENT
+}
+
+enum NotificationType {
+  TASK_ASSIGNED
+  DOCUMENT_REQUESTED
+  DEADLINE_APPROACHING
+  MONTH_CLOSE_DUE
+  APPROVAL_REQUIRED
+  PAYMENT_RECEIVED
+  OBLIGATION_OVERDUE
+  SYSTEM
+}
+
+enum AuditAction {
+  CREATE
+  UPDATE
+  DELETE
+  ARCHIVE
+  APPROVE
+  REJECT
+  LOCK
+  UNLOCK
+  LOGIN
+  LOGOUT
+  EXPORT
+}
+
+enum SubscriptionPlan {
+  SOLO
+  FIRM
+  PROFESSIONAL
+  ENTERPRISE
+}
+
+enum SubscriptionStatus {
+  TRIAL
+  ACTIVE
+  PAST_DUE
+  CANCELLED
+  EXPIRED
+}
+
+enum Currency {
+  KES
+  USD
+  EUR
+  GBP
+  TZS
+  UGX
+}
+
+// ─────────────────────────────────────────
+// FIRMS (Top-level tenant)
+// ─────────────────────────────────────────
+
+model Firm {
+  id              String   @id @default(cuid())
+  name            String
+  slug            String   @unique
+  logoUrl         String?
+  primaryColor    String?  @default("#1a56db")
+  accentColor     String?  @default("#e3a008")
+  customDomain    String?  @unique
+  subdomain       String?  @unique
+  phone           String?
+  email           String?
+  address         String?
+  county          String?
+  kraPin          String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  users           FirmUser[]
+  companies       ClientCompany[]
+  subscription    Subscription?
+  emailTemplates  EmailTemplate[]
+
+  @@index([slug])
+  @@index([subdomain])
+}
+
+model FirmUser {
+  id          String    @id @default(cuid())
+  firmId      String
+  userId      String
+  role        FirmRole  @default(BOOKKEEPER)
+  isActive    Boolean   @default(true)
+  invitedAt   DateTime  @default(now())
+  acceptedAt  DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  firm        Firm      @relation(fields: [firmId], references: [id], onDelete: Cascade)
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  assignedCompanies  CompanyAssignment[]
+
+  @@unique([firmId, userId])
+  @@index([firmId])
+  @@index([userId])
+}
+
+// ─────────────────────────────────────────
+// USERS
+// ─────────────────────────────────────────
+
+model User {
+  id              String    @id @default(cuid())
+  email           String    @unique
+  emailVerified   Boolean   @default(false)
+  passwordHash    String
+  firstName       String
+  lastName        String
+  phone           String?
+  avatarUrl       String?
+  totpSecret      String?
+  totpEnabled     Boolean   @default(false)
+  isActive        Boolean   @default(true)
+  lastLoginAt     DateTime?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  firmUsers       FirmUser[]
+  companyUsers    CompanyUser[]
+  sessions        UserSession[]
+  auditLogs       AuditLog[]
+  notifications   Notification[]
+  assignedTasks   Task[]        @relation("TaskAssignee")
+  createdTasks    Task[]        @relation("TaskCreator")
+  comments        Comment[]
+
+  @@index([email])
+}
+
+model UserSession {
+  id           String   @id @default(cuid())
+  userId       String
+  refreshToken String   @unique
+  deviceInfo   String?
+  ipAddress    String?
+  expiresAt    DateTime
+  createdAt    DateTime @default(now())
+
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([refreshToken])
+}
+
+// ─────────────────────────────────────────
+// CLIENT COMPANIES
+// ─────────────────────────────────────────
+
+model ClientCompany {
+  id                  String        @id @default(cuid())
+  firmId              String
+  name                String
+  registrationNumber  String?
+  kraPin              String?
+  vatStatus           VatStatus     @default(NOT_REGISTERED)
+  isTurnoverTax       Boolean       @default(false)
+  industry            Industry      @default(OTHER)
+  county              String?
+  address             String?
+  phone               String?
+  email               String?
+  website             String?
+  currency            Currency      @default(KES)
+  financialYearEnd    Int           @default(12)
+  status              CompanyStatus @default(ACTIVE)
+  etimsStatus         EtimsStatus   @default(NOT_STARTED)
+  healthScore         Int           @default(0)
+  logoUrl             String?
+  notes               String?
+  createdAt           DateTime      @default(now())
+  updatedAt           DateTime      @updatedAt
+
+  firm                Firm          @relation(fields: [firmId], references: [id], onDelete: Restrict)
+  users               CompanyUser[]
+  assignments         CompanyAssignment[]
+  bankAccounts        BankAccount[]
+  contacts            Contact[]
+  accounts            Account[]
+  documents           Document[]
+  invoices            Invoice[]
+  bills               Bill[]
+  journalEntries      JournalEntry[]
+  monthlyCloses       MonthlyClose[]
+  taxObligations      TaxObligation_[]
+  tasks               Task[]
+  payrollRuns         PayrollRun[]
+  employees           Employee[]
+  auditLogs           AuditLog[]
+  notifications       Notification[]
+
+  @@index([firmId])
+  @@index([kraPin])
+}
+
+model CompanyUser {
+  id          String     @id @default(cuid())
+  companyId   String
+  userId      String
+  role        ClientRole @default(CLIENT_OWNER)
+  isActive    Boolean    @default(true)
+  invitedAt   DateTime   @default(now())
+  acceptedAt  DateTime?
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+
+  company     ClientCompany @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  user        User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([companyId, userId])
+  @@index([companyId])
+  @@index([userId])
+}
+
+model CompanyAssignment {
+  id          String    @id @default(cuid())
+  companyId   String
+  firmUserId  String
+  isLead      Boolean   @default(false)
+  assignedAt  DateTime  @default(now())
+
+  company     ClientCompany @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  firmUser    FirmUser      @relation(fields: [firmUserId], references: [id], onDelete: Cascade)
+
+  @@unique([companyId, firmUserId])
+  @@index([companyId])
+  @@index([firmUserId])
+}
+
+// ─────────────────────────────────────────
+// CHART OF ACCOUNTS
+// ─────────────────────────────────────────
+
+model Account {
+  id            String         @id @default(cuid())
+  companyId     String
+  code          String
+  name          String
+  type          AccountType
+  subType       AccountSubType
+  parentId      String?
+  description   String?
+  isSystem      Boolean        @default(false)
+  isActive      Boolean        @default(true)
+  isBankAccount Boolean        @default(false)
+  currency      Currency       @default(KES)
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+
+  company       ClientCompany  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  parent        Account?       @relation("AccountHierarchy", fields: [parentId], references: [id])
+  children      Account[]      @relation("AccountHierarchy")
+  debitLines    JournalLine[]  @relation("DebitAccount")
+  creditLines   JournalLine[]  @relation("CreditAccount")
+
+  @@unique([companyId, code])
+  @@index([companyId])
+  @@index([type])
+}
+
+// ─────────────────────────────────────────
+// CONTACTS (customers + suppliers)
+// ─────────────────────────────────────────
+
+model Contact {
+  id              String      @id @default(cuid())
+  companyId       String
+  type            ContactType
+  name            String
+  kraPin          String?
+  email           String?
+  phone           String?
+  address         String?
+  county          String?
+  isVatRegistered Boolean     @default(false)
+  isWhtApplicable Boolean     @default(false)
+  paymentTermsDays Int        @default(30)
+  creditLimit     Decimal?    @db.Decimal(15, 2)
+  notes           String?
+  isActive        Boolean     @default(true)
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+
+  company         ClientCompany @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  invoices        Invoice[]
+  bills           Bill[]
+  payments        Payment[]
+
+  @@index([companyId])
+  @@index([type])
+  @@index([kraPin])
+}
+
+// ─────────────────────────────────────────
+// DOCUMENTS
+// ─────────────────────────────────────────
+
+model Document {
+  id              String         @id @default(cuid())
+  companyId       String
+  type            DocumentType
+  status          DocumentStatus @default(UPLOADED)
+  fileName        String
+  fileSize        Int
+  mimeType        String
+  storageKey      String
+  storageUrl      String?
+  fileHash        String?
+  uploadedBy      String
+  sourceEmail     String?
+  sourceWhatsApp  String?
+
+  // Extracted / entered metadata
+  supplierName    String?
+  customerName    String?
+  supplierPin     String?
+  invoiceNumber   String?
+  invoiceDate     DateTime?
+  grossAmount     Decimal?       @db.Decimal(15, 2)
+  vatAmount       Decimal?       @db.Decimal(15, 2)
+  netAmount       Decimal?       @db.Decimal(15, 2)
+  etimsRef        String?
+  hasEtims        Boolean        @default(false)
+  ocrConfidence   Float?
+  isDuplicate     Boolean        @default(false)
+  duplicateOfId   String?
+
+  // Links
+  billId          String?
+  invoiceId       String?
+
+  notes           String?
+  rejectionReason String?
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+
+  company         ClientCompany  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  bill            Bill?          @relation(fields: [billId], references: [id])
+  invoice         Invoice?       @relation(fields: [invoiceId], references: [id])
+  duplicateOf     Document?      @relation("DocumentDuplicate", fields: [duplicateOfId], references: [id])
+  duplicates      Document[]     @relation("DocumentDuplicate")
+
+  @@index([companyId])
+  @@index([status])
+  @@index([fileHash])
+  @@index([invoiceNumber])
+}
+
+// ─────────────────────────────────────────
+// INVOICES (Sales)
+// ─────────────────────────────────────────
+
+model Invoice {
+  id              String        @id @default(cuid())
+  companyId       String
+  contactId       String
+  invoiceNumber   String
+  type            String        @default("INVOICE") // INVOICE | PROFORMA | QUOTATION | CREDIT_NOTE
+  status          InvoiceStatus @default(DRAFT)
+  issueDate       DateTime
+  dueDate         DateTime?
+  currency        Currency      @default(KES)
+  exchangeRate    Decimal       @default(1) @db.Decimal(10, 6)
+  subTotal        Decimal       @db.Decimal(15, 2)
+  vatAmount       Decimal       @default(0) @db.Decimal(15, 2)
+  totalAmount     Decimal       @db.Decimal(15, 2)
+  amountPaid      Decimal       @default(0) @db.Decimal(15, 2)
+  amountDue       Decimal       @db.Decimal(15, 2)
+  etimsRef        String?
+  hasEtims        Boolean       @default(false)
+  notes           String?
+  terms           String?
+  sentAt          DateTime?
+  paidAt          DateTime?
+  voidedAt        DateTime?
+  voidReason      String?
+  createdBy       String
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+
+  company         ClientCompany @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  contact         Contact       @relation(fields: [contactId], references: [id])
+  lines           InvoiceLine[]
+  payments        Payment[]
+  documents       Document[]
+
+  @@unique([companyId, invoiceNumber])
+  @@index([companyId])
+  @@index([status])
+  @@index([contactId])
+  @@index([dueDate])
+}
+
+model InvoiceLine {
+  id          String   @id @default(cuid())
+  invoiceId   String
+  description String
+  quantity    Decimal  @db.Decimal(10, 3)
+  unitPrice   Decimal  @db.Decimal(15, 2)
+  discount    Decimal  @default(0) @db.Decimal(5, 2)
+  vatRate     Decimal  @default(0) @db.Decimal(5, 2)
+  vatAmount   Decimal  @default(0) @db.Decimal(15, 2)
+  lineTotal   Decimal  @db.Decimal(15, 2)
+  accountCode String?
+  sortOrder   Int      @default(0)
+
+  invoice     Invoice  @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+
+  @@index([invoiceId])
+}
+
+// ─────────────────────────────────────────
+// BILLS (Purchases)
+// ─────────────────────────────────────────
+
+model Bill {
+  id              String     @id @default(cuid())
+  companyId       String
+  contactId       String
+  billNumber      String?
+  supplierRef     String?
+  status          BillStatus @default(DRAFT)
+  billDate        DateTime
+  dueDate         DateTime?
+  currency        Currency   @default(KES)
+  exchangeRate    Decimal    @default(1) @db.Decimal(10, 6)
+  subTotal        Decimal    @db.Decimal(15, 2)
+  vatAmount       Decimal    @default(0) @db.Decimal(15, 2)
+  totalAmount     Decimal    @db.Decimal(15, 2)
+  amountPaid      Decimal    @default(0) @db.Decimal(15, 2)
+  amountDue       Decimal    @db.Decimal(15, 2)
+  supplierPin     String?
+  etimsRef        String?
+  hasEtims        Boolean    @default(false)
+  isWhtApplicable Boolean    @default(false)
+  whtAmount       Decimal?   @db.Decimal(15, 2)
+  isDuplicate     Boolean    @default(false)
+  notes           String?
+  approvedBy      String?
+  approvedAt      DateTime?
+  rejectionReason String?
+  paidAt          DateTime?
+  voidedAt        DateTime?
+  voidReason      String?
+  createdBy       String
+  createdAt       DateTime   @default(now())
+  updatedAt       DateTime   @updatedAt
+
+  company         ClientCompany @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  contact         Contact       @relation(fields: [contactId], references: [id])
+  lines           BillLine[]
+  payments        Payment[]
+  documents       Document[]
+
+  @@index([companyId])
+  @@index([status])
+  @@index([contactId])
+  @@index([dueDate])
+}
+
+model BillLine {
+  id          String  @id @default(cuid())
+  billId      String
+  description String
+  quantity    Decimal @db.Decimal(10, 3)
+  unitPrice   Decimal @db.Decimal(15, 2)
+  vatRate     Decimal @default(0) @db.Decimal(5, 2)
+  vatAmount   Decimal @default(0) @db.Decimal(15, 2)
+  lineTotal   Decimal @db.Decimal(15, 2)
+  accountCode String?
+  sortOrder   Int     @default(0)
+
+  bill        Bill    @relation(fields: [billId], references: [id], onDelete: Cascade)
+
+  @@index([billId])
+}
+
+// ─────────────────────────────────────────
+// PAYMENTS
+// ─────────────────────────────────────────
+
+model Payment {
+  id            String   @id @default(cuid())
+  companyId     String
+  contactId     String
+  direction     String   // IN | OUT
+  amount        Decimal  @db.Decimal(15, 2)
+  currency      Currency @default(KES)
+  paymentDate   DateTime
+  method        String?  // BANK | MPESA | CASH | CHEQUE
+  reference     String?
+  bankAccountId String?
+  invoiceId     String?
+  billId        String?
+  notes         String?
+  createdBy     String
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  contact       Contact       @relation(fields: [contactId], references: [id])
+  invoice       Invoice?      @relation(fields: [invoiceId], references: [id])
+  bill          Bill?         @relation(fields: [billId], references: [id])
+  bankAccount   BankAccount?  @relation(fields: [bankAccountId], references: [id])
+
+  @@index([companyId])
+  @@index([contactId])
+  @@index([paymentDate])
+}
+
+// ─────────────────────────────────────────
+// BANK ACCOUNTS & STATEMENTS
+// ─────────────────────────────────────────
+
+model BankAccount {
+  id            String   @id @default(cuid())
+  companyId     String
+  accountId     String?
+  name          String
+  bankName      String?
+  accountNumber String?
+  isMpesa       Boolean  @default(false)
+  mpesaType     String?  // TILL | PAYBILL | PERSONAL
+  mpesaNumber   String?
+  currency      Currency @default(KES)
+  openingBalance Decimal @default(0) @db.Decimal(15, 2)
+  currentBalance Decimal @default(0) @db.Decimal(15, 2)
+  isActive      Boolean  @default(true)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  company       ClientCompany       @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  statements    BankStatement[]
+  payments      Payment[]
+  rules         BankRule[]
+
+  @@index([companyId])
+}
+
+model BankStatement {
+  id              String   @id @default(cuid())
+  bankAccountId   String
+  fileName        String
+  importedAt      DateTime @default(now())
+  statementFrom   DateTime?
+  statementTo     DateTime?
+  openingBalance  Decimal? @db.Decimal(15, 2)
+  closingBalance  Decimal? @db.Decimal(15, 2)
+  totalLines      Int      @default(0)
+  matchedLines    Int      @default(0)
+  importedBy      String
+
+  bankAccount     BankAccount          @relation(fields: [bankAccountId], references: [id], onDelete: Cascade)
+  lines           BankStatementLine[]
+
+  @@index([bankAccountId])
+}
+
+model BankStatementLine {
+  id                String               @id @default(cuid())
+  statementId       String
+  date              DateTime
+  narration         String
+  debit             Decimal?             @db.Decimal(15, 2)
+  credit            Decimal?             @db.Decimal(15, 2)
+  balance           Decimal?             @db.Decimal(15, 2)
+  reference         String?
+  status            ReconciliationStatus @default(UNRECONCILED)
+  accountCode       String?
+  contactId         String?
+  journalEntryId    String?
+  ruleId            String?
+  notes             String?
+  createdAt         DateTime             @default(now())
+
+  statement         BankStatement        @relation(fields: [statementId], references: [id], onDelete: Cascade)
+  appliedRule       BankRule?            @relation(fields: [ruleId], references: [id])
+
+  @@index([statementId])
+  @@index([status])
+  @@index([date])
+}
+
+model BankRule {
+  id              String   @id @default(cuid())
+  bankAccountId   String
+  name            String
+  conditionField  String   // NARRATION | AMOUNT | CONTACT
+  conditionOp     String   // CONTAINS | EQUALS | GT | LT
+  conditionValue  String
+  accountCode     String
+  contactId       String?
+  description     String?
+  isActive        Boolean  @default(true)
+  priority        Int      @default(0)
+  matchCount      Int      @default(0)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  bankAccount     BankAccount         @relation(fields: [bankAccountId], references: [id], onDelete: Cascade)
+  appliedLines    BankStatementLine[]
+
+  @@index([bankAccountId])
+}
+
+// ─────────────────────────────────────────
+// JOURNAL ENTRIES (Double-entry ledger)
+// ─────────────────────────────────────────
+
+model JournalEntry {
+  id              String          @id @default(cuid())
+  companyId       String
+  type            TransactionType
+  reference       String?
+  description     String
+  entryDate       DateTime
+  currency        Currency        @default(KES)
+  exchangeRate    Decimal         @default(1) @db.Decimal(10, 6)
+  totalDebit      Decimal         @db.Decimal(15, 2)
+  totalCredit     Decimal         @db.Decimal(15, 2)
+  isPosted        Boolean         @default(false)
+  isReversed      Boolean         @default(false)
+  reversedById    String?
+  approvedBy      String?
+  approvedAt      DateTime?
+  isRecurring     Boolean         @default(false)
+  recurringId     String?
+  periodYear      Int
+  periodMonth     Int
+  createdBy       String
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+
+  company         ClientCompany  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  lines           JournalLine[]
+  reversedBy      JournalEntry?  @relation("JournalReversal", fields: [reversedById], references: [id])
+  reversals       JournalEntry[] @relation("JournalReversal")
+
+  @@index([companyId])
+  @@index([periodYear, periodMonth])
+  @@index([entryDate])
+  @@index([type])
+}
+
+model JournalLine {
+  id              String       @id @default(cuid())
+  journalEntryId  String
+  debitAccountId  String?
+  creditAccountId String?
+  amount          Decimal      @db.Decimal(15, 2)
+  description     String?
+  contactId       String?
+  sortOrder       Int          @default(0)
+
+  journalEntry    JournalEntry @relation(fields: [journalEntryId], references: [id], onDelete: Cascade)
+  debitAccount    Account?     @relation("DebitAccount", fields: [debitAccountId], references: [id])
+  creditAccount   Account?     @relation("CreditAccount", fields: [creditAccountId], references: [id])
+
+  @@index([journalEntryId])
+  @@index([debitAccountId])
+  @@index([creditAccountId])
+}
+
+// ─────────────────────────────────────────
+// PAYROLL
+// ─────────────────────────────────────────
+
+model Employee {
+  id              String         @id @default(cuid())
+  companyId       String
+  employeeNumber  String?
+  firstName       String
+  lastName        String
+  nationalId      String?
+  kraPin          String?
+  nssfNumber      String?
+  shifNumber      String?
+  email           String?
+  phone           String?
+  department      String?
+  jobTitle        String?
+  employmentType  EmploymentType @default(FULL_TIME)
+  startDate       DateTime
+  endDate         DateTime?
+  basicSalary     Decimal        @db.Decimal(15, 2)
+  bankName        String?
+  bankAccount     String?
+  mpesaNumber     String?
+  isActive        Boolean        @default(true)
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+
+  company         ClientCompany  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  payslips        Payslip[]
+  allowances      EmployeeAllowance[]
+  deductions      EmployeeDeduction[]
+
+  @@unique([companyId, kraPin])
+  @@index([companyId])
+}
+
+model EmployeeAllowance {
+  id          String   @id @default(cuid())
+  employeeId  String
+  name        String
+  amount      Decimal  @db.Decimal(15, 2)
+  isTaxable   Boolean  @default(true)
+  isActive    Boolean  @default(true)
+
+  employee    Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+
+  @@index([employeeId])
+}
+
+model EmployeeDeduction {
+  id          String   @id @default(cuid())
+  employeeId  String
+  name        String
+  amount      Decimal  @db.Decimal(15, 2)
+  isLoan      Boolean  @default(false)
+  isActive    Boolean  @default(true)
+
+  employee    Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+
+  @@index([employeeId])
+}
+
+model PayrollRun {
+  id              String        @id @default(cuid())
+  companyId       String
+  periodYear      Int
+  periodMonth     Int
+  status          PayrollStatus @default(DRAFT)
+  totalGross      Decimal       @db.Decimal(15, 2)
+  totalPaye       Decimal       @db.Decimal(15, 2)
+  totalNssf       Decimal       @db.Decimal(15, 2)
+  totalShif       Decimal       @db.Decimal(15, 2)
+  totalHousingLevy Decimal      @db.Decimal(15, 2)
+  totalDeductions Decimal       @db.Decimal(15, 2)
+  totalNet        Decimal       @db.Decimal(15, 2)
+  totalEmployerCost Decimal     @db.Decimal(15, 2)
+  approvedBy      String?
+  approvedAt      DateTime?
+  processedAt     DateTime?
+  notes           String?
+  createdBy       String
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+
+  company         ClientCompany @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  payslips        Payslip[]
+
+  @@unique([companyId, periodYear, periodMonth])
+  @@index([companyId])
+}
+
+model Payslip {
+  id              String     @id @default(cuid())
+  payrollRunId    String
+  employeeId      String
+  basicSalary     Decimal    @db.Decimal(15, 2)
+  totalAllowances Decimal    @db.Decimal(15, 2)
+  grossPay        Decimal    @db.Decimal(15, 2)
+  paye            Decimal    @db.Decimal(15, 2)
+  nssfEmployee    Decimal    @db.Decimal(15, 2)
+  nssfEmployer    Decimal    @db.Decimal(15, 2)
+  shifEmployee    Decimal    @db.Decimal(15, 2)
+  shifEmployer    Decimal    @db.Decimal(15, 2)
+  housingLevy     Decimal    @db.Decimal(15, 2)
+  otherDeductions Decimal    @db.Decimal(15, 2)
+  netPay          Decimal    @db.Decimal(15, 2)
+  employerCost    Decimal    @db.Decimal(15, 2)
+  pdfUrl          String?
+  createdAt       DateTime   @default(now())
+
+  payrollRun      PayrollRun @relation(fields: [payrollRunId], references: [id], onDelete: Cascade)
+  employee        Employee   @relation(fields: [employeeId], references: [id])
+
+  @@unique([payrollRunId, employeeId])
+  @@index([payrollRunId])
+  @@index([employeeId])
+}
+
+// ─────────────────────────────────────────
+// TAX COMPLIANCE CALENDAR
+// ─────────────────────────────────────────
+
+model TaxObligation_ {
+  id              String            @id @default(cuid())
+  companyId       String
+  obligation      TaxObligation
+  periodYear      Int
+  periodMonth     Int
+  dueDate         DateTime
+  status          ObligationStatus  @default(UPCOMING)
+  assignedTo      String?
+  reviewedBy      String?
+  filingRef       String?
+  filingEvidenceUrl String?
+  paymentRef      String?
+  paymentEvidenceUrl String?
+  paymentAmount   Decimal?          @db.Decimal(15, 2)
+  filedAt         DateTime?
+  paidAt          DateTime?
+  notes           String?
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
+
+  company         ClientCompany     @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  @@unique([companyId, obligation, periodYear, periodMonth])
+  @@index([companyId])
+  @@index([dueDate])
+  @@index([status])
+}
+
+// ─────────────────────────────────────────
+// MONTHLY CLOSE
+// ─────────────────────────────────────────
+
+model MonthlyClose {
+  id          String      @id @default(cuid())
+  companyId   String
+  year        Int
+  month       Int
+  status      CloseStatus @default(NOT_STARTED)
+  lockedAt    DateTime?
+  lockedBy    String?
+  reopenedAt  DateTime?
+  reopenedBy  String?
+  reopenReason String?
+  notes       String?
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+
+  company     ClientCompany       @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  items       MonthlyCloseItem[]
+
+  @@unique([companyId, year, month])
+  @@index([companyId])
+  @@index([status])
+}
+
+model MonthlyCloseItem {
+  id            String      @id @default(cuid())
+  closeId       String
+  step          Int
+  name          String
+  status        CloseStatus @default(NOT_STARTED)
+  assignedTo    String?
+  completedBy   String?
+  completedAt   DateTime?
+  notes         String?
+
+  monthlyClose  MonthlyClose @relation(fields: [closeId], references: [id], onDelete: Cascade)
+
+  @@index([closeId])
+}
+
+// ─────────────────────────────────────────
+// TASKS AND COMMUNICATION
+// ─────────────────────────────────────────
+
+model Task {
+  id            String       @id @default(cuid())
+  companyId     String
+  title         String
+  description   String?
+  status        TaskStatus   @default(OPEN)
+  priority      TaskPriority @default(MEDIUM)
+  assigneeId    String?
+  createdById   String
+  dueDate       DateTime?
+  completedAt   DateTime?
+  isDocumentRequest Boolean  @default(false)
+  uploadToken   String?      @unique
+  entityType    String?      // invoice | bill | transaction | obligation
+  entityId      String?
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @updatedAt
+
+  company       ClientCompany @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  assignee      User?         @relation("TaskAssignee", fields: [assigneeId], references: [id])
+  createdBy     User          @relation("TaskCreator", fields: [createdById], references: [id])
+  comments      Comment[]
+
+  @@index([companyId])
+  @@index([assigneeId])
+  @@index([status])
+  @@index([dueDate])
+}
+
+model Comment {
+  id          String   @id @default(cuid())
+  taskId      String
+  authorId    String
+  body        String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  task        Task     @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  author      User     @relation(fields: [authorId], references: [id])
+
+  @@index([taskId])
+}
+
+// ─────────────────────────────────────────
+// NOTIFICATIONS
+// ─────────────────────────────────────────
+
+model Notification {
+  id          String           @id @default(cuid())
+  userId      String
+  companyId   String?
+  type        NotificationType
+  title       String
+  body        String
+  link        String?
+  isRead      Boolean          @default(false)
+  readAt      DateTime?
+  createdAt   DateTime         @default(now())
+
+  user        User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  company     ClientCompany?   @relation(fields: [companyId], references: [id])
+
+  @@index([userId])
+  @@index([isRead])
+  @@index([createdAt])
+}
+
+// ─────────────────────────────────────────
+// AUDIT LOG
+// ─────────────────────────────────────────
+
+model AuditLog {
+  id          String      @id @default(cuid())
+  userId      String
+  companyId   String?
+  action      AuditAction
+  entityType  String
+  entityId    String
+  before      Json?
+  after       Json?
+  reason      String?
+  ipAddress   String?
+  userAgent   String?
+  createdAt   DateTime    @default(now())
+
+  user        User          @relation(fields: [userId], references: [id])
+  company     ClientCompany? @relation(fields: [companyId], references: [id])
+
+  @@index([userId])
+  @@index([companyId])
+  @@index([entityType, entityId])
+  @@index([createdAt])
+}
+
+// ─────────────────────────────────────────
+// SUBSCRIPTIONS AND BILLING
+// ─────────────────────────────────────────
+
+model Subscription {
+  id                String             @id @default(cuid())
+  firmId            String             @unique
+  plan              SubscriptionPlan   @default(SOLO)
+  status            SubscriptionStatus @default(TRIAL)
+  maxClients        Int                @default(10)
+  trialEndsAt       DateTime?
+  currentPeriodStart DateTime?
+  currentPeriodEnd  DateTime?
+  externalId        String?
+  cancelledAt       DateTime?
+  createdAt         DateTime           @default(now())
+  updatedAt         DateTime           @updatedAt
+
+  firm              Firm               @relation(fields: [firmId], references: [id], onDelete: Cascade)
+}
+
+// ─────────────────────────────────────────
+// EMAIL TEMPLATES
+// ─────────────────────────────────────────
+
+model EmailTemplate {
+  id          String   @id @default(cuid())
+  firmId      String
+  name        String
+  subject     String
+  body        String
+  variables   String[] // list of variable names used in template
+  isDefault   Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  firm        Firm     @relation(fields: [firmId], references: [id], onDelete: Cascade)
+
+  @@unique([firmId, name])
+  @@index([firmId])
+}
