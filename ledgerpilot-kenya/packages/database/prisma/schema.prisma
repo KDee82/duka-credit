@@ -360,18 +360,21 @@ model User {
   totpSecret      String?
   totpEnabled     Boolean   @default(false)
   isActive        Boolean   @default(true)
+  loginAttempts   Int       @default(0)
+  lockedUntil     DateTime?
   lastLoginAt     DateTime?
   createdAt       DateTime  @default(now())
   updatedAt       DateTime  @updatedAt
 
-  firmUsers       FirmUser[]
-  companyUsers    CompanyUser[]
-  sessions        UserSession[]
-  auditLogs       AuditLog[]
-  notifications   Notification[]
-  assignedTasks   Task[]        @relation("TaskAssignee")
-  createdTasks    Task[]        @relation("TaskCreator")
-  comments        Comment[]
+  firmUsers             FirmUser[]
+  companyUsers          CompanyUser[]
+  sessions              UserSession[]
+  verificationTokens    VerificationToken[]
+  auditLogs             AuditLog[]
+  notifications         Notification[]
+  assignedTasks         Task[]        @relation("TaskAssignee")
+  createdTasks          Task[]        @relation("TaskCreator")
+  comments              Comment[]
 
   @@index([email])
 }
@@ -389,6 +392,30 @@ model UserSession {
 
   @@index([userId])
   @@index([refreshToken])
+}
+
+enum TokenPurpose {
+  EMAIL_VERIFICATION
+  PASSWORD_RESET
+  STAFF_INVITATION
+  CLIENT_INVITATION
+}
+
+model VerificationToken {
+  id          String        @id @default(cuid())
+  userId      String?
+  token       String        @unique
+  purpose     TokenPurpose
+  email       String
+  metadata    Json?
+  expiresAt   DateTime
+  usedAt      DateTime?
+  createdAt   DateTime      @default(now())
+
+  user        User?         @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([token])
+  @@index([email, purpose])
 }
 
 // ─────────────────────────────────────────

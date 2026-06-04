@@ -6,6 +6,8 @@ import { FirmsModule } from './firms/firms.module';
 import { CompaniesModule } from './companies/companies.module';
 import { AccountsModule } from './accounts/accounts.module';
 import { DocumentsModule } from './documents/documents.module';
+import { StaffModule } from './staff/staff.module';
+import { AuditModule } from './audit/audit.module';
 import { DatabaseModule } from './common/database.module';
 
 @Module({
@@ -18,6 +20,8 @@ import { DatabaseModule } from './common/database.module';
     CompaniesModule,
     AccountsModule,
     DocumentsModule,
+    StaffModule,
+    AuditModule,
   ],
 })
 export class AppModule {}
