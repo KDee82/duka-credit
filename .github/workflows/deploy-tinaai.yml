@@ -1,7 +1,7 @@
 name: Deploy TinaAi Telegram Bot to ServerAvatar
 
 on:
-  workflow_dispatch:   # manual trigger from GitHub Actions tab
+  workflow_dispatch:
   push:
     branches:
       - claude/tinaai-github-folder-5iokh7
@@ -10,38 +10,49 @@ on:
 
 jobs:
   deploy:
-    name: Deploy to ServerAvatar
+    name: Deploy to Server via SSH
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
+      - name: Deploy TinaAi via SSH
+        uses: appleboy/ssh-action@v1
         with:
-          ref: claude/tinaai-github-folder-5iokh7
+          host: 136.244.100.92
+          username: tinaaiuser
+          password: ${{ secrets.SSH_PASSWORD }}
+          script: |
+            set -e
+            REPO_DIR="/home/tinaaiuser/duka-credit"
+            BOT_DIR="$REPO_DIR/TinaAi/telegram"
+            BRANCH="claude/tinaai-github-folder-5iokh7"
 
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: '20'
-          cache: 'npm'
-          cache-dependency-path: TinaAi/telegram/package-lock.json
+            echo "→ Updating code..."
+            if [ -d "$REPO_DIR/.git" ]; then
+              cd "$REPO_DIR"
+              git fetch origin "$BRANCH"
+              git reset --hard "origin/$BRANCH"
+            else
+              git clone --branch "$BRANCH" \
+                https://github.com/KDee82/duka-credit.git "$REPO_DIR"
+            fi
 
-      - name: Install dependencies
-        working-directory: TinaAi/telegram
-        run: npm install
+            echo "→ Installing dependencies..."
+            cd "$BOT_DIR"
+            npm install --omit=dev
 
-      - name: Deploy to ServerAvatar
-        working-directory: TinaAi/telegram
-        env:
-          SERVERAVATAR_TOKEN: ${{ secrets.SERVERAVATAR_TOKEN }}
-          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
-          GROK_API_KEY: ${{ secrets.GROK_API_KEY }}
-          CLAUDE_API_KEY: ${{ secrets.CLAUDE_API_KEY }}
-        run: |
-          node deploy.js 2>&1 | tee /tmp/deploy_output.txt
-          EXIT_CODE=${PIPESTATUS[0]}
-          echo "## Deploy Output" >> $GITHUB_STEP_SUMMARY
-          echo '```' >> $GITHUB_STEP_SUMMARY
-          cat /tmp/deploy_output.txt >> $GITHUB_STEP_SUMMARY
-          echo '```' >> $GITHUB_STEP_SUMMARY
-          exit $EXIT_CODE
+            echo "→ Writing .env..."
+            cat > .env <<ENVEOF
+            TELEGRAM_BOT_TOKEN=${{ secrets.TELEGRAM_BOT_TOKEN }}
+            GROK_API_KEY=${{ secrets.GROK_API_KEY }}
+            CLAUDE_API_KEY=${{ secrets.CLAUDE_API_KEY }}
+            ENVEOF
+
+            echo "→ Starting bot with PM2..."
+            command -v pm2 || npm install -g pm2
+            if pm2 describe tinaai > /dev/null 2>&1; then
+              pm2 restart tinaai
+            else
+              pm2 start "$BOT_DIR/bot.js" --name tinaai
+            fi
+            pm2 save
+            echo "✅ TinaAi deployed and running!"
