@@ -71,10 +71,23 @@ app.delete('/api/note', (req, res) => {
 
 app.get('/api/status', (_req, res) => {
   res.json({
-    grok:   !!GROK_KEY,
-    claude: !!CLAUDE_KEY,
+    grok:    !!GROK_KEY,
+    claude:  !!CLAUDE_KEY,
     primary: GROK_KEY ? 'grok' : (CLAUDE_KEY ? 'claude' : 'none'),
   });
+});
+
+app.get('/api/test', async (_req, res) => {
+  try {
+    const reply = await getReply(
+      [{ role: 'user', content: 'Say "OK" and nothing else.' }],
+      'You are a test bot. Reply with only "OK".',
+      keys,
+    );
+    res.json({ ok: true, reply });
+  } catch (err) {
+    res.status(500).json({ ok: false, error: err.message });
+  }
 });
 
 app.listen(PORT, () => {

@@ -8,7 +8,7 @@ about their business finances. Be concise, friendly, and practical.`,
 
   grok: {
     apiUrl: 'https://api.x.ai/v1/chat/completions',
-    model: 'grok-3',
+    model: 'grok-3-beta',
   },
 
   claude: {
