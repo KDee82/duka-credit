@@ -1,7 +1,8 @@
-import 'dotenv/config';
+import { config as dotenvConfig } from 'dotenv';
 import express from 'express';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
+dotenvConfig({ path: join(dirname(fileURLToPath(import.meta.url)), '.env') });
 import { getReply } from './tinaai.js';
 import { buildSystemPrompt } from './character.js';
 import {
