@@ -20,6 +20,7 @@ jobs:
           host: 136.244.100.92
           username: tinaaiuser
           password: ${{ secrets.SSH_PASSWORD }}
+          request_pty: true
           script: |
             set -e
             REPO_DIR="/home/tinaaiuser/duka-credit"
