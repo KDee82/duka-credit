@@ -34,14 +34,14 @@ function greeting(profile) {
   const name = profile.name ? `, ${profile.name}` : '';
   const shop = profile.shopName ? ` for *${profile.shopName}*` : '';
   return (
-    `👋 Hi${name}! I'm *${CHARACTER.name}*, your Duka Credit assistant${shop}.\n\n` +
-    `Here's what I can help with:\n` +
-    `• Track and manage customer credit\n` +
-    `• Calculate balances, totals & installments\n` +
-    `• Draft payment reminders for customers\n` +
-    `• Answer business finance questions\n` +
-    `• Advise on credit limits & overdue follow-ups\n\n` +
-    `Type anything to get started, or use /help for all commands.`
+    `👋 Hi${name}! I'm *${CHARACTER.name}*${shop} — your intelligent assistant.\n\n` +
+    `I'm highly capable across multiple areas:\n\n` +
+    `💼 *Business & Finance* — credit tracking, balances, cash flow, financial advice\n` +
+    `💻 *Coding & Tech* — write, debug & explain code in any language\n` +
+    `🤝 *Customer Care* — draft responses, handle complaints, retain customers\n` +
+    `✍️ *Messaging & Writing* — WhatsApp, SMS, emails, letters, reminders\n` +
+    `🧠 *General Intelligence* — research, analysis, problem-solving, ideas\n\n` +
+    `Just ask me anything. Use /help for all commands.`
   );
 }
 
