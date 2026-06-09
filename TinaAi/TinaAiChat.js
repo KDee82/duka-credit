@@ -14,7 +14,7 @@ import { sendMessage } from './api';
 import { buildUserMessage, buildAssistantMessage, formatTimestamp } from './utils';
 import TINAAI_CONFIG from './config';
 
-export default function TinaAiChat({ apiKey }) {
+export default function TinaAiChat({ grokApiKey, claudeApiKey }) {
   const [messages, setMessages] = useState([
     {
       id: '0',
@@ -46,7 +46,7 @@ export default function TinaAiChat({ apiKey }) {
     conversationRef.current = [...conversationRef.current, buildUserMessage(text)];
 
     try {
-      const reply = await sendMessage(conversationRef.current, apiKey);
+      const reply = await sendMessage(conversationRef.current, { grokApiKey, claudeApiKey });
       conversationRef.current = [...conversationRef.current, buildAssistantMessage(reply)];
 
       setMessages((prev) => [
