@@ -72,11 +72,17 @@ async function getServer(orgId) {
 async function findApp(orgId, serverId) {
   console.log(`→ Looking for "${APP_NAME}" application...`);
   const data = await api('GET', `/organizations/${orgId}/servers/${serverId}/applications`);
-  const apps = data.applications ?? data;
-  const list = Array.isArray(apps) ? apps : Object.values(apps);
-  console.log(`  Found ${list.length} app(s): ${list.map(a => a.name).join(', ')}`);
-  const app = list.find(a => a.name?.toLowerCase() === APP_NAME.toLowerCase());
-  if (!app) throw new Error(`No app named "${APP_NAME}". Apps found: ${list.map(a => a.name).join(', ')}`);
+  console.log(`  Response keys: ${Object.keys(data).join(', ')}`);
+
+  // Handle various response shapes: { applications: [...] }, { application: [...] }, array, paginated object
+  const raw = data.applications ?? data.application ?? data.data ?? data;
+  const list = (Array.isArray(raw) ? raw : Object.values(raw)).filter(
+    (a) => a && typeof a === 'object' && 'id' in a,
+  );
+
+  console.log(`  Found ${list.length} app(s): ${list.map((a) => a.name).join(', ')}`);
+  const app = list.find((a) => a.name?.toLowerCase() === APP_NAME.toLowerCase());
+  if (!app) throw new Error(`No app named "${APP_NAME}". Apps found: ${list.map((a) => a.name).join(', ')}`);
   console.log(`  ✓ Found: ${app.name} (id ${app.id})`);
   return app;
 }
