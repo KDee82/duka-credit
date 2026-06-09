@@ -14,34 +14,18 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-        with:
-          ref: claude/tinaai-github-folder-5iokh7
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: '20'
-          cache: 'npm'
-          cache-dependency-path: TinaAi/telegram/package-lock.json
-
-      - name: Install dependencies
-        working-directory: TinaAi/telegram
-        run: npm install
-
-      - name: Deploy to ServerAvatar
-        working-directory: TinaAi/telegram
-        env:
-          SERVERAVATAR_TOKEN: ${{ secrets.SERVERAVATAR_TOKEN }}
-          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
-          GROK_API_KEY: ${{ secrets.GROK_API_KEY }}
-          CLAUDE_API_KEY: ${{ secrets.CLAUDE_API_KEY }}
+      - name: Trigger ServerAvatar deployment
         run: |
-          node deploy.js 2>&1 | tee /tmp/deploy_output.txt
-          EXIT_CODE=${PIPESTATUS[0]}
-          echo "## Deploy Output" >> $GITHUB_STEP_SUMMARY
-          echo '```' >> $GITHUB_STEP_SUMMARY
-          cat /tmp/deploy_output.txt >> $GITHUB_STEP_SUMMARY
-          echo '```' >> $GITHUB_STEP_SUMMARY
-          exit $EXIT_CODE
+          WEBHOOK="${{ secrets.DEPLOY_WEBHOOK_URL }}"
+          WEBHOOK="${WEBHOOK:-https://api.serveravatar.com/webhooks/git-deployments/P6fz3fmZN2e9TVSjas8jftl8Toaa1sde}"
+          echo "Posting to webhook..."
+          HTTP_CODE=$(curl -s -o /tmp/webhook_response.txt -w "%{http_code}" -X POST "$WEBHOOK")
+          echo "Response (HTTP $HTTP_CODE):"
+          cat /tmp/webhook_response.txt
+          echo ""
+          if [ "$HTTP_CODE" -ge 200 ] && [ "$HTTP_CODE" -lt 300 ]; then
+            echo "✅ Deployment triggered successfully"
+          else
+            echo "✗ Webhook returned HTTP $HTTP_CODE"
+            exit 1
+          fi
