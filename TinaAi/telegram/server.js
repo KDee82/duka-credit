@@ -17,7 +17,7 @@ import {
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const GROK_KEY   = process.env.GROK_API_KEY;
 const CLAUDE_KEY = process.env.CLAUDE_API_KEY;
-const PORT       = process.env.PORT || process.env.TEST_PORT || 3000;
+const PORT       = process.env.PORT || process.env.TEST_PORT || 3001;
 const keys       = { grokApiKey: GROK_KEY, claudeApiKey: CLAUDE_KEY };
 
 const app = express();
