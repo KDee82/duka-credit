@@ -1,0 +1,128 @@
+name: CI
+
+on:
+  push:
+    branches: [main, develop, "claude/**"]
+  pull_request:
+    branches: [main, develop]
+
+env:
+  NODE_VERSION: "22"
+  PNPM_VERSION: "10"
+
+jobs:
+  lint-and-typecheck:
+    name: Lint & Type Check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: ${{ env.PNPM_VERSION }}
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+        working-directory: ledgerpilot-kenya
+
+      - name: Lint
+        run: pnpm lint
+        working-directory: ledgerpilot-kenya
+
+  test:
+    name: Unit Tests
+    runs-on: ubuntu-latest
+    needs: lint-and-typecheck
+
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: ledgerpilot
+          POSTGRES_PASSWORD: ledgerpilot_test
+          POSTGRES_DB: ledgerpilot_test
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    env:
+      DATABASE_URL: postgresql://ledgerpilot:ledgerpilot_test@localhost:5432/ledgerpilot_test
+      JWT_SECRET: ci-test-secret-at-least-32-characters-long
+      JWT_REFRESH_SECRET: ci-test-refresh-secret-at-least-32-chars
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: ${{ env.PNPM_VERSION }}
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+        working-directory: ledgerpilot-kenya
+
+      - name: Generate Prisma client
+        run: pnpm db:generate
+        working-directory: ledgerpilot-kenya
+
+      - name: Run migrations
+        run: pnpm --filter @ledgerpilot/database exec prisma migrate deploy
+        working-directory: ledgerpilot-kenya
+
+      - name: Run tests
+        run: pnpm test
+        working-directory: ledgerpilot-kenya
+
+  build:
+    name: Build
+    runs-on: ubuntu-latest
+    needs: test
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: ${{ env.PNPM_VERSION }}
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+        working-directory: ledgerpilot-kenya
+
+      - name: Generate Prisma client
+        run: pnpm db:generate
+        working-directory: ledgerpilot-kenya
+
+      - name: Build all apps
+        run: pnpm build
+        working-directory: ledgerpilot-kenya
+        env:
+          NEXT_PUBLIC_API_URL: https://api.ledgerpilot.co.ke/api/v1
+          DATABASE_URL: postgresql://placeholder:placeholder@localhost:5432/placeholder
+          JWT_SECRET: placeholder-build-secret-32-characters
+
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-output
+          path: |
+            ledgerpilot-kenya/apps/web/.next
+            ledgerpilot-kenya/apps/api/dist
+          retention-days: 7
