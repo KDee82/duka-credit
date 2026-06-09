@@ -2,7 +2,6 @@ import { config as dotenvConfig } from 'dotenv';
 import express from 'express';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
-dotenvConfig({ path: join(dirname(fileURLToPath(import.meta.url)), '.env') });
 import { getReply } from './tinaai.js';
 import { buildSystemPrompt } from './character.js';
 import {
@@ -16,6 +15,7 @@ import {
 } from './memory.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
+dotenvConfig({ path: join(__dirname, '.env') });
 const GROK_KEY   = process.env.GROK_API_KEY;
 const CLAUDE_KEY = process.env.CLAUDE_API_KEY;
 const PORT       = process.env.PORT || process.env.TEST_PORT || 3001;
