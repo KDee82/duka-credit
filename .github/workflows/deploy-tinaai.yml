@@ -37,4 +37,11 @@ jobs:
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           GROK_API_KEY: ${{ secrets.GROK_API_KEY }}
           CLAUDE_API_KEY: ${{ secrets.CLAUDE_API_KEY }}
-        run: node deploy.js
+        run: |
+          node deploy.js 2>&1 | tee /tmp/deploy_output.txt
+          EXIT_CODE=${PIPESTATUS[0]}
+          echo "## Deploy Output" >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+          cat /tmp/deploy_output.txt >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+          exit $EXIT_CODE
