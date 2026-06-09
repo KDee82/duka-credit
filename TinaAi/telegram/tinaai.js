@@ -1,8 +1,8 @@
 import config from './config.js';
 
-const { grok, claude, systemPrompt, maxTokens, temperature } = config;
+const { grok, claude, maxTokens, temperature } = config;
 
-async function sendViaGrok(messages, apiKey) {
+async function sendViaGrok(messages, systemPrompt, apiKey) {
   const res = await fetch(grok.apiUrl, {
     method: 'POST',
     headers: {
@@ -26,7 +26,7 @@ async function sendViaGrok(messages, apiKey) {
   return data.choices[0].message.content;
 }
 
-async function sendViaClaude(messages, apiKey) {
+async function sendViaClaude(messages, systemPrompt, apiKey) {
   const res = await fetch(claude.apiUrl, {
     method: 'POST',
     headers: {
@@ -52,10 +52,10 @@ async function sendViaClaude(messages, apiKey) {
   return data.content[0].text;
 }
 
-export async function getReply(messages, { grokApiKey, claudeApiKey }) {
+export async function getReply(messages, systemPrompt, { grokApiKey, claudeApiKey }) {
   if (grokApiKey) {
     try {
-      return await sendViaGrok(messages, grokApiKey);
+      return await sendViaGrok(messages, systemPrompt, grokApiKey);
     } catch (err) {
       if (!claudeApiKey) throw err;
       console.warn(`[TinaAi] Grok failed (${err.message}), falling back to Claude`);
@@ -63,5 +63,5 @@ export async function getReply(messages, { grokApiKey, claudeApiKey }) {
   }
 
   if (!claudeApiKey) throw new Error('No AI API key configured');
-  return sendViaClaude(messages, claudeApiKey);
+  return sendViaClaude(messages, systemPrompt, claudeApiKey);
 }

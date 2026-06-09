@@ -2,99 +2,177 @@ import 'dotenv/config';
 import { Telegraf } from 'telegraf';
 import { message } from 'telegraf/filters';
 import { getReply } from './tinaai.js';
-import config from './config.js';
+import { buildSystemPrompt, CHARACTER } from './character.js';
+import {
+  loadSession,
+  addMessage,
+  updateProfile,
+  resetHistory,
+  forgetAll,
+  removeNote,
+} from './memory.js';
 
-const BOT_TOKEN   = process.env.TELEGRAM_BOT_TOKEN;
-const GROK_KEY    = process.env.GROK_API_KEY;
-const CLAUDE_KEY  = process.env.CLAUDE_API_KEY;
+const BOT_TOKEN  = process.env.TELEGRAM_BOT_TOKEN;
+const GROK_KEY   = process.env.GROK_API_KEY;
+const CLAUDE_KEY = process.env.CLAUDE_API_KEY;
 
 if (!BOT_TOKEN) {
   console.error('TELEGRAM_BOT_TOKEN is not set in .env');
   process.exit(1);
 }
-
 if (!GROK_KEY && !CLAUDE_KEY) {
   console.error('At least one of GROK_API_KEY or CLAUDE_API_KEY must be set in .env');
   process.exit(1);
 }
 
 const bot = new Telegraf(BOT_TOKEN);
+const keys = { grokApiKey: GROK_KEY, claudeApiKey: CLAUDE_KEY };
 
-// Per-chat conversation history (in-memory)
-const sessions = new Map();
+// ── Helpers ──────────────────────────────────────────────────────────────────
 
-function getHistory(chatId) {
-  if (!sessions.has(chatId)) sessions.set(chatId, []);
-  return sessions.get(chatId);
-}
-
-function clearHistory(chatId) {
-  sessions.set(chatId, []);
-}
-
-// /start
-bot.start((ctx) => {
-  clearHistory(ctx.chat.id);
-  return ctx.reply(
-    `Hi! I'm ${config.name}, your Duka Credit assistant.\n\n` +
-    `I can help you with:\n` +
-    `• Customer credit management\n` +
-    `• Transaction tracking\n` +
-    `• Business finance questions\n\n` +
-    `Just send me a message to get started.\n` +
-    `Use /reset to start a fresh conversation.`
+function greeting(profile) {
+  const name = profile.name ? `, ${profile.name}` : '';
+  const shop = profile.shopName ? ` for *${profile.shopName}*` : '';
+  return (
+    `👋 Hi${name}! I'm *${CHARACTER.name}*, your Duka Credit assistant${shop}.\n\n` +
+    `Here's what I can help with:\n` +
+    `• Track and manage customer credit\n` +
+    `• Calculate balances, totals & installments\n` +
+    `• Draft payment reminders for customers\n` +
+    `• Answer business finance questions\n` +
+    `• Advise on credit limits & overdue follow-ups\n\n` +
+    `Type anything to get started, or use /help for all commands.`
   );
+}
+
+// ── Commands ─────────────────────────────────────────────────────────────────
+
+bot.start((ctx) => {
+  const { profile } = loadSession(ctx.chat.id);
+  return ctx.reply(greeting(profile), { parse_mode: 'Markdown' });
 });
 
-// /reset
-bot.command('reset', (ctx) => {
-  clearHistory(ctx.chat.id);
-  return ctx.reply('Conversation cleared. Start fresh anytime!');
-});
-
-// /help
 bot.help((ctx) => {
   return ctx.reply(
-    `*${config.name} Commands*\n\n` +
-    `/start — Welcome message & reset chat\n` +
-    `/reset — Clear conversation history\n` +
-    `/help  — Show this message\n\n` +
-    `Just type any question to chat with me!`,
+    `*${CHARACTER.name} Commands*\n\n` +
+    `*Profile*\n` +
+    `/setname <name>   — Save your name\n` +
+    `/setshop <name>   — Save your shop name\n` +
+    `/setlocation <loc> — Save your location\n` +
+    `/addnote <text>   — Add a note to your profile\n` +
+    `/removenote <n>   — Remove note by number\n\n` +
+    `*Memory*\n` +
+    `/memory   — Show what I remember about you\n` +
+    `/reset    — Clear conversation history (keeps profile)\n` +
+    `/forget   — Erase all memory including profile\n\n` +
+    `*Other*\n` +
+    `/help  — Show this message\n` +
+    `/start — Welcome message`,
     { parse_mode: 'Markdown' }
   );
 });
 
-// Text messages
-bot.on(message('text'), async (ctx) => {
-  const chatId = ctx.chat.id;
-  const userText = ctx.message.text;
-  const history = getHistory(chatId);
+// Profile setters
+bot.command('setname', (ctx) => {
+  const name = ctx.message.text.replace('/setname', '').trim();
+  if (!name) return ctx.reply('Usage: /setname Your Name');
+  updateProfile(ctx.chat.id, { name });
+  return ctx.reply(`Got it! I'll call you *${name}* from now on.`, { parse_mode: 'Markdown' });
+});
 
-  // Show typing indicator
+bot.command('setshop', (ctx) => {
+  const shopName = ctx.message.text.replace('/setshop', '').trim();
+  if (!shopName) return ctx.reply('Usage: /setshop My Shop Name');
+  updateProfile(ctx.chat.id, { shopName });
+  return ctx.reply(`Shop saved as *${shopName}*.`, { parse_mode: 'Markdown' });
+});
+
+bot.command('setlocation', (ctx) => {
+  const location = ctx.message.text.replace('/setlocation', '').trim();
+  if (!location) return ctx.reply('Usage: /setlocation Nairobi');
+  updateProfile(ctx.chat.id, { location });
+  return ctx.reply(`Location saved as *${location}*.`, { parse_mode: 'Markdown' });
+});
+
+bot.command('addnote', (ctx) => {
+  const note = ctx.message.text.replace('/addnote', '').trim();
+  if (!note) return ctx.reply('Usage: /addnote something to remember');
+  updateProfile(ctx.chat.id, { note });
+  return ctx.reply(`Note added: _${note}_`, { parse_mode: 'Markdown' });
+});
+
+bot.command('removenote', (ctx) => {
+  const n = parseInt(ctx.message.text.replace('/removenote', '').trim(), 10);
+  if (isNaN(n)) return ctx.reply('Usage: /removenote <number>  (see /memory for note numbers)');
+  const removed = removeNote(ctx.chat.id, n);
+  return ctx.reply(removed ? `Note #${n} removed.` : `No note at that number. Use /memory to check.`);
+});
+
+// Memory viewer
+bot.command('memory', (ctx) => {
+  const { profile, history } = loadSession(ctx.chat.id);
+  const lines = ['*What I remember about you:*\n'];
+
+  if (profile.name)     lines.push(`👤 Name: ${profile.name}`);
+  if (profile.shopName) lines.push(`🏪 Shop: ${profile.shopName}`);
+  if (profile.location) lines.push(`📍 Location: ${profile.location}`);
+  if (profile.firstSeen) lines.push(`📅 First chat: ${profile.firstSeen}`);
+  if (profile.lastSeen)  lines.push(`🕐 Last seen: ${profile.lastSeen}`);
+
+  if (profile.notes && profile.notes.length) {
+    lines.push('\n📝 Notes:');
+    profile.notes.forEach((n, i) => lines.push(`  ${i + 1}. ${n}`));
+  }
+
+  lines.push(`\n💬 Conversation history: ${history.length} message(s) stored`);
+
+  if (lines.length === 2) lines.push('Nothing stored yet. Use /setname and /setshop to get started.');
+
+  return ctx.reply(lines.join('\n'), { parse_mode: 'Markdown' });
+});
+
+// Reset / forget
+bot.command('reset', (ctx) => {
+  resetHistory(ctx.chat.id);
+  return ctx.reply('Conversation cleared. Your profile is still saved. Start fresh anytime!');
+});
+
+bot.command('forget', async (ctx) => {
+  forgetAll(ctx.chat.id);
+  return ctx.reply('All memory erased. I no longer know anything about you.');
+});
+
+// ── Message handler ───────────────────────────────────────────────────────────
+
+bot.on(message('text'), async (ctx) => {
+  const chatId   = ctx.chat.id;
+  const userText = ctx.message.text;
+
   await ctx.sendChatAction('typing');
 
-  history.push({ role: 'user', content: userText });
+  const { profile, history } = loadSession(chatId);
+  const systemPrompt = buildSystemPrompt(profile);
+
+  addMessage(chatId, 'user', userText);
 
   try {
-    const reply = await getReply(history, {
-      grokApiKey: GROK_KEY,
-      claudeApiKey: CLAUDE_KEY,
-    });
-
-    history.push({ role: 'assistant', content: reply });
+    const reply = await getReply([...history, { role: 'user', content: userText }], systemPrompt, keys);
+    addMessage(chatId, 'assistant', reply);
     await ctx.reply(reply);
   } catch (err) {
     console.error(`[TinaAi] Error for chat ${chatId}:`, err.message);
-    // Remove the failed user message so history stays clean
-    history.pop();
-    await ctx.reply('Sorry, I ran into an error. Please try again in a moment.');
+    // Roll back the user message we just saved
+    const { history: h } = loadSession(chatId);
+    h.pop();
+    await ctx.reply('Sorry, I ran into a problem. Please try again in a moment.');
   }
 });
 
-// Graceful shutdown
+// ── Launch ────────────────────────────────────────────────────────────────────
+
 process.once('SIGINT', () => bot.stop('SIGINT'));
 process.once('SIGTERM', () => bot.stop('SIGTERM'));
 
 bot.launch().then(() => {
-  console.log(`[TinaAi] Telegram bot is running (provider: ${GROK_KEY ? 'Grok' : 'Claude'})`);
+  console.log(`[TinaAi] Bot running | Provider: ${GROK_KEY ? 'Grok → Claude fallback' : 'Claude only'}`);
 });

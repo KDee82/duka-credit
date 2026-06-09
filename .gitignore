@@ -34,5 +34,6 @@ yarn-error.log*
 .env.*.local
 TinaAi/telegram/.env
 
-# Telegram bot dependencies
+# Telegram bot dependencies and runtime data
 TinaAi/telegram/node_modules/
+TinaAi/telegram/data/
