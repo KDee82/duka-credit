@@ -40,12 +40,15 @@ async function api(method, path, body) {
   let json;
   try { json = JSON.parse(text); } catch { json = { raw: text }; }
 
+  console.log(`  [${method} ${path}] → ${res.status}`);
+
   if (!res.ok) {
-    console.error(`\n✗ ${method} ${path} → ${res.status}`);
-    console.error(JSON.stringify(json, null, 2));
-    throw new Error(`API error ${res.status}`);
+    console.error(`\n✗ Failed: ${method} ${path} → HTTP ${res.status}`);
+    console.error('Response body:', JSON.stringify(json, null, 2));
+    throw new Error(`API error ${res.status} on ${method} ${path}`);
   }
 
+  console.log('  Response keys:', Object.keys(json).join(', '));
   return json;
 }
 
