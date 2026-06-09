@@ -4,8 +4,11 @@
  * Run from TinaAi/telegram/:  node deploy.js
  */
 
-const WEBHOOK_URL = process.env.DEPLOY_WEBHOOK_URL
-  || 'https://api.serveravatar.com/webhooks/git-deployments/P6fz3fmZN2e9TVSjas8jftl8Toaa1sde';
+const WEBHOOK_URL = process.env.DEPLOY_WEBHOOK_URL;
+if (!WEBHOOK_URL) {
+  console.error('✗ DEPLOY_WEBHOOK_URL environment variable is not set');
+  process.exit(1);
+}
 
 async function main() {
   console.log('\n🤖 TinaAi — Triggering ServerAvatar deployment\n');

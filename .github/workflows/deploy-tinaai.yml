@@ -17,7 +17,10 @@ jobs:
       - name: Trigger ServerAvatar deployment
         run: |
           WEBHOOK="${{ secrets.DEPLOY_WEBHOOK_URL }}"
-          WEBHOOK="${WEBHOOK:-https://api.serveravatar.com/webhooks/git-deployments/P6fz3fmZN2e9TVSjas8jftl8Toaa1sde}"
+          if [ -z "$WEBHOOK" ]; then
+            echo "✗ DEPLOY_WEBHOOK_URL secret is not set in GitHub repository secrets"
+            exit 1
+          fi
           echo "Posting to webhook..."
           HTTP_CODE=$(curl -s -o /tmp/webhook_response.txt -w "%{http_code}" -X POST "$WEBHOOK")
           echo "Response (HTTP $HTTP_CODE):"
