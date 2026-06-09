@@ -65,18 +65,27 @@ async function inspectApp() {
   console.log('→ Fetching app details...');
   const data = await api('GET', APP_BASE);
   const app = data.application ?? data;
-  console.log(`  Keys: ${Object.keys(data).join(', ')}`);
+  console.log(`  Top-level keys: ${Object.keys(data).join(', ')}`);
+  console.log(`  App fields: ${Object.keys(app).join(', ')}`);
+  console.log(`  gitDeployment: ${JSON.stringify(data.gitDeployment ?? 'none', null, 2)}`);
   const relevant = ['name', 'framework', 'git_provider', 'repository', 'branch',
                     'status', 'php_version', 'node_version', 'username'];
   const info = Object.fromEntries(relevant.filter(k => app[k] != null).map(k => [k, app[k]]));
   console.log(`  App: ${JSON.stringify(info)}`);
-  return app;
+  return { app, gitDeployment: data.gitDeployment };
 }
 
 // ── Git update — try every plausible endpoint ────────────────────────────────
 
-async function updateGit() {
+async function updateGit(gitDeployment) {
   console.log('→ Probing git update endpoints...');
+
+  // gitDeployment from the GET response might tell us the update endpoint
+  if (gitDeployment) {
+    const gdKeys = Object.keys(gitDeployment);
+    console.log(`  gitDeployment keys: ${gdKeys.join(', ')}`);
+  }
+
   const gitPayload = {
     git_provider: 'github',
     repository:   REPO,
@@ -84,25 +93,57 @@ async function updateGit() {
     auto_deploy:  true,
   };
 
-  // Most likely candidates based on ServerAvatar API patterns
+  const gitDeploymentPayload = {
+    provider:     'github',
+    repository:   REPO,
+    branch:       BRANCH,
+    auto_deploy:  true,
+  };
+
   const candidates = [
-    ['PUT',   `${APP_BASE}/git`],
-    ['POST',  `${APP_BASE}/git`],
-    ['PATCH', `${APP_BASE}/git`],
-    ['PUT',   `${APP_BASE}/github`],
-    ['PUT',   `${APP_BASE}/git-configuration`],
-    ['PATCH', APP_BASE, gitPayload],
-    ['PUT',   APP_BASE, gitPayload],
+    ['PUT',   `${APP_BASE}/git`, gitPayload],
+    ['PUT',   `${APP_BASE}/git-deployment`, gitDeploymentPayload],
+    ['POST',  `${APP_BASE}/git-deployment`, gitDeploymentPayload],
+    ['PATCH', `${APP_BASE}/git-deployment`, gitDeploymentPayload],
+    ['PUT',   `${APP_BASE}/github`, gitPayload],
+    ['PUT',   `${APP_BASE}/git-configuration`, gitPayload],
+    ['PUT',   `${APP_BASE}/repository`, gitPayload],
+    ['POST',  `${APP_BASE}/repository`, gitPayload],
   ];
 
   for (const [method, path, body] of candidates) {
-    const result = await tryApi(method, path, body ?? gitPayload);
+    const result = await tryApi(method, path, body);
     if (result !== null) {
       console.log(`  ✓ Git updated via ${method} ${path}`);
       return;
     }
   }
-  console.warn('  ⚠ Could not update git settings — trying deploy anyway');
+  console.warn('  ⚠ Could not update git settings — continuing');
+}
+
+// ── Clean / Reset working directory ──────────────────────────────────────────
+
+async function cleanWorkingDir() {
+  console.log('→ Probing working directory clean/reset endpoints...');
+  const candidates = [
+    ['POST', `${APP_BASE}/git/discard`],
+    ['POST', `${APP_BASE}/git/reset`],
+    ['POST', `${APP_BASE}/git/clean`],
+    ['POST', `${APP_BASE}/git/hard-reset`],
+    ['POST', `${APP_BASE}/git/reset-hard`],
+    ['POST', `${APP_BASE}/git/restore`],
+    ['DELETE', `${APP_BASE}/git/changes`],
+  ];
+
+  for (const [method, path] of candidates) {
+    const result = await tryApi(method, path);
+    if (result !== null) {
+      console.log(`  ✓ Working dir cleaned via ${method} ${path}`);
+      return true;
+    }
+  }
+  console.warn('  ⚠ Could not find a clean/reset endpoint');
+  return false;
 }
 
 // ── Node.js config ───────────────────────────────────────────────────────────
@@ -165,9 +206,14 @@ async function main() {
   if (!SA_TOKEN)               { console.error('✗ SERVERAVATAR_TOKEN not set'); process.exit(1); }
   if (!BOT_TOKEN || !GROK_KEY) { console.error('✗ TELEGRAM_BOT_TOKEN and GROK_API_KEY required'); process.exit(1); }
 
-  await inspectApp();
-  await updateGit();
+  const { gitDeployment } = await inspectApp();
+  await updateGit(gitDeployment);
   await configureNode();
+  const cleaned = await cleanWorkingDir();
+  if (cleaned) {
+    console.log('  → Retrying git/pull after clean...');
+    await tryApi('POST', `${APP_BASE}/git/pull`);
+  }
   await deploy();
 
   console.log('\n✅ TinaAi deployment triggered!\n');
