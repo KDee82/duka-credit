@@ -119,11 +119,17 @@ async function triggerDeploy(orgId, serverId, appId) {
 }
 
 async function updateEnvVars(orgId, serverId, appId) {
-  console.log('→ Setting environment variables...');
-  await api('PUT', `/organizations/${orgId}/servers/${serverId}/applications/${appId}/node-deployment`, {
-    environment_variable: buildEnvVars(),
-  });
-  console.log('  ✓ Environment variables set');
+  console.log('→ Confirming environment variables...');
+  try {
+    await api('PUT', `/organizations/${orgId}/servers/${serverId}/applications/${appId}/node-deployment`, {
+      environment_variable: buildEnvVars(),
+    });
+    console.log('  ✓ Environment variables confirmed');
+  } catch (err) {
+    // Non-fatal: env vars were already set in createApplication
+    console.warn(`  ⚠ Could not update env vars via node-deployment endpoint (${err.message})`);
+    console.warn('    Env vars set during app creation will be used instead — this is fine.');
+  }
 }
 
 function buildEnvVars() {

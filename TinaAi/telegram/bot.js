@@ -9,6 +9,7 @@ import {
   updateProfile,
   resetHistory,
   forgetAll,
+  removeLastMessage,
   removeNote,
 } from './memory.js';
 
@@ -161,9 +162,7 @@ bot.on(message('text'), async (ctx) => {
     await ctx.reply(reply);
   } catch (err) {
     console.error(`[TinaAi] Error for chat ${chatId}:`, err.message);
-    // Roll back the user message we just saved
-    const { history: h } = loadSession(chatId);
-    h.pop();
+    removeLastMessage(chatId);
     await ctx.reply('Sorry, I ran into a problem. Please try again in a moment.');
   }
 });

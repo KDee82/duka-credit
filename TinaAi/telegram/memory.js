@@ -90,6 +90,16 @@ export function forgetAll(chatId) {
   save(store);
 }
 
+/** Remove the last message from history and persist (used to roll back on AI error). */
+export function removeLastMessage(chatId) {
+  const store = load();
+  const session = getSession(store, chatId);
+  if (session.history.length > 0) {
+    session.history.pop();
+    save(store);
+  }
+}
+
 /** Remove a specific note by index (1-based). */
 export function removeNote(chatId, index) {
   const store = load();
