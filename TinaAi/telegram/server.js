@@ -1,7 +1,11 @@
 import { config as dotenvConfig } from 'dotenv';
-import express from 'express';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
+
+const __dirname = dirname(fileURLToPath(import.meta.url));
+dotenvConfig({ path: join(__dirname, '.env') });
+
+import express from 'express';
 import { getReply } from './tinaai.js';
 import { buildSystemPrompt } from './character.js';
 import {
@@ -14,33 +18,33 @@ import {
   removeNote,
 } from './memory.js';
 
-const __dirname = dirname(fileURLToPath(import.meta.url));
-dotenvConfig({ path: join(__dirname, '.env') });
-const GROK_KEY   = process.env.GROK_API_KEY;
-const CLAUDE_KEY = process.env.CLAUDE_API_KEY;
-const PORT       = process.env.PORT || process.env.TEST_PORT || 3001;
-const keys       = { grokApiKey: GROK_KEY, claudeApiKey: CLAUDE_KEY };
-
+const PORT = process.env.PORT || process.env.TEST_PORT || 3001;
 const app = express();
 app.use(express.json());
 app.use(express.static(join(__dirname, 'public')));
 
+function getKeys() {
+  return {
+    grokApiKey: process.env.GROK_API_KEY,
+    claudeApiKey: process.env.CLAUDE_API_KEY,
+  };
+}
+
 app.post('/api/chat', async (req, res) => {
   const { message, chatId = 'web-test' } = req.body;
   if (!message?.trim()) return res.status(400).json({ error: 'message required' });
-
   const { profile, history } = loadSession(chatId);
   const systemPrompt = buildSystemPrompt(profile);
   addMessage(chatId, 'user', message);
-
   try {
+    const keys = getKeys();
     const reply = await getReply(
       [...history, { role: 'user', content: message }],
       systemPrompt,
       keys,
     );
     addMessage(chatId, 'assistant', reply);
-    const provider = GROK_KEY ? 'grok' : 'claude';
+    const provider = keys.grokApiKey ? 'grok' : 'claude';
     res.json({ reply, provider });
   } catch (err) {
     removeLastMessage(chatId);
@@ -71,15 +75,17 @@ app.delete('/api/note', (req, res) => {
 });
 
 app.get('/api/status', (_req, res) => {
+  const keys = getKeys();
   res.json({
-    grok:    !!GROK_KEY,
-    claude:  !!CLAUDE_KEY,
-    primary: GROK_KEY ? 'grok' : (CLAUDE_KEY ? 'claude' : 'none'),
+    grok: !!keys.grokApiKey,
+    claude: !!keys.claudeApiKey,
+    primary: keys.grokApiKey ? 'grok' : (keys.claudeApiKey ? 'claude' : 'none'),
   });
 });
 
 app.get('/api/test', async (_req, res) => {
   try {
+    const keys = getKeys();
     const reply = await getReply(
       [{ role: 'user', content: 'Say "OK" and nothing else.' }],
       'You are a test bot. Reply with only "OK".',
@@ -92,8 +98,9 @@ app.get('/api/test', async (_req, res) => {
 });
 
 app.listen(PORT, () => {
+  const keys = getKeys();
   console.log(`\n🤖 TinaAi Test UI\n`);
-  console.log(`   http://localhost:${PORT}\n`);
-  console.log(`   Grok:   ${GROK_KEY   ? '✓ configured' : '✗ not set'}`);
-  console.log(`   Claude: ${CLAUDE_KEY ? '✓ configured' : '✗ not set'}\n`);
+  console.log(` http://localhost:${PORT}\n`);
+  console.log(` Grok: ${keys.grokApiKey ? '✓ configured' : '✗ not set'}`);
+  console.log(` Claude: ${keys.claudeApiKey ? '✓ configured' : '✗ not set'}\n`);
 });
