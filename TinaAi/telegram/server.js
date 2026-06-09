@@ -18,7 +18,7 @@ import {
   removeNote,
 } from './memory.js';
 
-const PORT = process.env.PORT || process.env.TEST_PORT || 3001;
+const PORT = process.env.PORT || process.env.TEST_PORT || 3000;
 const app = express();
 app.use(express.json());
 app.use(express.static(join(__dirname, 'public')));
