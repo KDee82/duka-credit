@@ -14,7 +14,10 @@ import { sendMessage } from './api';
 import { buildUserMessage, buildAssistantMessage, formatTimestamp } from './utils';
 import TINAAI_CONFIG from './config';
 
-export default function TinaAiChat({ grokApiKey, claudeApiKey }) {
+export default function TinaAiChat({
+  grokApiKey = process.env.EXPO_PUBLIC_GROK_API_KEY,
+  claudeApiKey = process.env.EXPO_PUBLIC_CLAUDE_API_KEY,
+}) {
   const [messages, setMessages] = useState([
     {
       id: '0',
