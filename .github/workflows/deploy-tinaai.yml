@@ -10,84 +10,38 @@ on:
 
 jobs:
   deploy:
-    name: Deploy to Server via SSH
+    name: Deploy to ServerAvatar
     runs-on: ubuntu-latest
 
     steps:
-      - name: Install sshpass
-        run: sudo apt-get install -y sshpass
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          ref: claude/tinaai-github-folder-5iokh7
 
-      - name: Test SSH connectivity
-        env:
-          SSHPASS: ${{ secrets.SSH_PASSWORD }}
-        run: |
-          echo "→ Scanning SSH host key..."
-          ssh-keyscan -T 10 136.244.100.92 2>&1 || true
-          echo ""
-          echo "→ Testing SSH login..."
-          sshpass -e ssh -v \
-            -o StrictHostKeyChecking=no \
-            -o UserKnownHostsFile=/dev/null \
-            -o ConnectTimeout=15 \
-            tinaaiuser@136.244.100.92 \
-            'echo "SSH OK: $(whoami)"' 2>&1
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: TinaAi/telegram/package-lock.json
 
-      - name: Deploy TinaAi
+      - name: Install dependencies
+        working-directory: TinaAi/telegram
+        run: npm install
+
+      - name: Deploy to ServerAvatar
+        working-directory: TinaAi/telegram
         env:
-          SSHPASS: ${{ secrets.SSH_PASSWORD }}
+          SERVERAVATAR_TOKEN: ${{ secrets.SERVERAVATAR_TOKEN }}
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           GROK_API_KEY: ${{ secrets.GROK_API_KEY }}
           CLAUDE_API_KEY: ${{ secrets.CLAUDE_API_KEY }}
         run: |
-          # Write the deploy script locally, pass secrets as positional args
-          cat > /tmp/tinaai-deploy.sh << 'SCRIPT'
-          #!/bin/bash
-          set -e
-          TG_TOKEN="$1"
-          GROK_KEY="$2"
-          CLAUDE_KEY="$3"
-
-          REPO_DIR="/home/tinaaiuser/duka-credit"
-          BOT_DIR="$REPO_DIR/TinaAi/telegram"
-          BRANCH="claude/tinaai-github-folder-5iokh7"
-
-          echo "→ Updating code..."
-          if [ -d "$REPO_DIR/.git" ]; then
-            cd "$REPO_DIR"
-            git fetch origin "$BRANCH"
-            git reset --hard "origin/$BRANCH"
-          else
-            git clone --branch "$BRANCH" \
-              https://github.com/KDee82/duka-credit.git "$REPO_DIR"
-          fi
-
-          echo "→ Installing dependencies..."
-          cd "$BOT_DIR"
-          npm install --omit=dev
-
-          echo "→ Writing .env..."
-          printf 'TELEGRAM_BOT_TOKEN=%s\nGROK_API_KEY=%s\nCLAUDE_API_KEY=%s\n' \
-            "$TG_TOKEN" "$GROK_KEY" "$CLAUDE_KEY" > .env
-
-          echo "→ Starting bot with PM2..."
-          command -v pm2 || npm install -g pm2
-          if pm2 describe tinaai > /dev/null 2>&1; then
-            pm2 restart tinaai
-          else
-            pm2 start "$BOT_DIR/bot.js" --name tinaai
-          fi
-          pm2 save
-          echo "✅ TinaAi deployed and running!"
-          SCRIPT
-
-          # Copy the script to the server, then execute it
-          sshpass -e scp \
-            -o StrictHostKeyChecking=no \
-            -o UserKnownHostsFile=/dev/null \
-            /tmp/tinaai-deploy.sh tinaaiuser@136.244.100.92:/tmp/tinaai-deploy.sh
-
-          sshpass -e ssh \
-            -o StrictHostKeyChecking=no \
-            -o UserKnownHostsFile=/dev/null \
-            tinaaiuser@136.244.100.92 \
-            "bash /tmp/tinaai-deploy.sh '$TELEGRAM_BOT_TOKEN' '$GROK_API_KEY' '$CLAUDE_API_KEY'"
+          node deploy.js 2>&1 | tee /tmp/deploy_output.txt
+          EXIT_CODE=${PIPESTATUS[0]}
+          echo "## Deploy Output" >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+          cat /tmp/deploy_output.txt >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+          exit $EXIT_CODE

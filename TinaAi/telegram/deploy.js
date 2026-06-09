@@ -1,8 +1,8 @@
 #!/usr/bin/env node
 /**
  * ServerAvatar deployment script for TinaAi Telegram bot.
- * Finds the existing "TinaAi" app on your ServerAvatar server,
- * updates its git repo to this project, and deploys.
+ * Uses hardcoded IDs (org 18639 / server 40301 / app 147145) to avoid
+ * the /applications listing endpoint which returns empty for this token.
  *
  * Run from TinaAi/telegram/:  node deploy.js
  */
@@ -17,7 +17,10 @@ const CLAUDE_KEY = process.env.CLAUDE_API_KEY || '';
 const BASE     = 'https://api.serveravatar.com';
 const REPO     = 'KDee82/duka-credit';
 const BRANCH   = 'claude/tinaai-github-folder-5iokh7';
-const APP_NAME = 'TinaAi';
+
+const ORG_ID    = 18639;
+const SERVER_ID = 40301;
+const APP_ID    = 147145;
 
 // ── HTTP helper ──────────────────────────────────────────────────────────────
 
@@ -45,67 +48,31 @@ async function api(method, path, body) {
   return json;
 }
 
-// ── Discovery ────────────────────────────────────────────────────────────────
-
-async function getOrg() {
-  console.log('→ Fetching organization...');
-  const data = await api('GET', '/organizations');
-  const orgs = data.organizations ?? data;
-  const org  = Array.isArray(orgs) ? orgs[0] : Object.values(orgs)[0];
-  if (!org?.id) throw new Error(`Unexpected /organizations response: ${JSON.stringify(data)}`);
-  console.log(`  ✓ ${org.name} (id ${org.id})`);
-  return org;
-}
-
-async function getServer(orgId) {
-  console.log('→ Fetching servers...');
-  const data = await api('GET', `/organizations/${orgId}/servers`);
-  const servers = data.servers ?? data;
-  const list = Array.isArray(servers) ? servers : Object.values(servers);
-  if (!list.length) throw new Error('No servers on this account');
-  list.forEach((s, i) => console.log(`  [${i}] ${s.name} — ${s.ip} (${s.operating_system})`));
-  const server = list[0];
-  console.log(`  ✓ Using: ${server.name} (id ${server.id})`);
-  return server;
-}
-
-async function findApp(orgId, serverId) {
-  console.log(`→ Looking for "${APP_NAME}" application...`);
-  const data = await api('GET', `/organizations/${orgId}/servers/${serverId}/applications`);
-  const apps = data.applications ?? data;
-  const list = Array.isArray(apps) ? apps : Object.values(apps);
-  console.log(`  Found ${list.length} app(s): ${list.map(a => a.name).join(', ')}`);
-  const app = list.find(a => a.name?.toLowerCase() === APP_NAME.toLowerCase());
-  if (!app) throw new Error(`No app named "${APP_NAME}". Apps found: ${list.map(a => a.name).join(', ')}`);
-  console.log(`  ✓ Found: ${app.name} (id ${app.id})`);
-  return app;
-}
-
 // ── Configuration ────────────────────────────────────────────────────────────
 
-async function updateGit(orgId, serverId, appId) {
+async function updateGit() {
   console.log('→ Updating git repository...');
-  await api('PUT', `/organizations/${orgId}/servers/${serverId}/applications/${appId}/git`, {
-    git_provider:  'github',
-    repository:    REPO,
-    branch:        BRANCH,
-    auto_deploy:   true,
+  await api('PUT', `/organizations/${ORG_ID}/servers/${SERVER_ID}/applications/${APP_ID}/git`, {
+    git_provider: 'github',
+    repository:   REPO,
+    branch:       BRANCH,
+    auto_deploy:  true,
   });
   console.log(`  ✓ Repo set to ${REPO} @ ${BRANCH}`);
 }
 
-async function configureNode(orgId, serverId, appId) {
+async function configureNode() {
   console.log('→ Configuring Node.js runtime...');
   try {
-    await api('PUT', `/organizations/${orgId}/servers/${serverId}/applications/${appId}/node-deployment`, {
-      rendering:              'ssr',
-      package_manager:        'npm',
-      process_mode:           'fork',
-      port:                   3000,
+    await api('PUT', `/organizations/${ORG_ID}/servers/${SERVER_ID}/applications/${APP_ID}/node-deployment`, {
+      rendering:               'ssr',
+      package_manager:         'npm',
+      process_mode:            'fork',
+      port:                    3000,
       package_install_command: 'cd TinaAi/telegram && npm install',
-      build_command:          '',
-      start_app_command:      'node TinaAi/telegram/bot.js',
-      environment_variable:   buildEnvVars(),
+      build_command:           '',
+      start_app_command:       'node TinaAi/telegram/bot.js',
+      environment_variable:    buildEnvVars(),
     });
     console.log('  ✓ Node.js runtime configured');
   } catch (err) {
@@ -113,10 +80,10 @@ async function configureNode(orgId, serverId, appId) {
   }
 }
 
-async function setDeployScript(orgId, serverId, appId) {
+async function setDeployScript() {
   console.log('→ Setting deployment script...');
   try {
-    await api('POST', `/organizations/${orgId}/servers/${serverId}/applications/${appId}/git/script`, {
+    await api('POST', `/organizations/${ORG_ID}/servers/${SERVER_ID}/applications/${APP_ID}/git/script`, {
       script: 'cd TinaAi/telegram && npm install',
     });
     console.log('  ✓ Deploy script set');
@@ -125,9 +92,9 @@ async function setDeployScript(orgId, serverId, appId) {
   }
 }
 
-async function deploy(orgId, serverId, appId) {
+async function deploy() {
   console.log('→ Triggering deployment...');
-  await api('POST', `/organizations/${orgId}/servers/${serverId}/applications/${appId}/git/deploy`);
+  await api('POST', `/organizations/${ORG_ID}/servers/${SERVER_ID}/applications/${APP_ID}/git/deploy`);
   console.log('  ✓ Deployment triggered');
 }
 
@@ -144,24 +111,22 @@ function buildEnvVars() {
 
 async function main() {
   console.log('\n🤖 TinaAi — ServerAvatar Deployment\n');
+  console.log(`  Org    : ${ORG_ID}`);
+  console.log(`  Server : ${SERVER_ID}`);
+  console.log(`  App    : ${APP_ID}`);
+  console.log('');
 
-  if (!SA_TOKEN)             { console.error('✗ SERVERAVATAR_TOKEN not set'); process.exit(1); }
+  if (!SA_TOKEN)              { console.error('✗ SERVERAVATAR_TOKEN not set'); process.exit(1); }
   if (!BOT_TOKEN || !GROK_KEY) { console.error('✗ TELEGRAM_BOT_TOKEN and GROK_API_KEY required'); process.exit(1); }
 
-  const org    = await getOrg();
-  const server = await getServer(org.id);
-  const app    = await findApp(org.id, server.id);
-
-  await updateGit(org.id, server.id, app.id);
-  await configureNode(org.id, server.id, app.id);
-  await setDeployScript(org.id, server.id, app.id);
-  await deploy(org.id, server.id, app.id);
+  await updateGit();
+  await configureNode();
+  await setDeployScript();
+  await deploy();
 
   console.log(`
 ✅ TinaAi deployment triggered!
 
-  App       : ${app.name} (id ${app.id})
-  Server    : ${server.name} (${server.ip})
   Repo      : ${REPO} @ ${BRANCH}
   Start cmd : node TinaAi/telegram/bot.js
 
