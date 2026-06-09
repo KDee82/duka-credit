@@ -16,6 +16,8 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+        with:
+          ref: claude/tinaai-github-folder-5iokh7
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
