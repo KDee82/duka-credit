@@ -3,10 +3,11 @@
   "version": "1.0.0",
   "description": "TinaAi Telegram bot — Grok primary, Claude fallback",
   "type": "module",
-  "main": "bot.js",
+  "main": "server.js",
   "scripts": {
-    "start": "node bot.js",
-    "dev": "node --watch bot.js",
+    "start": "node server.js",
+    "bot": "node bot.js",
+    "dev": "node --watch server.js",
     "ui": "node server.js",
     "ui:dev": "node --watch server.js"
   },
