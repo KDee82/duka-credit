@@ -13,6 +13,7 @@ module.exports = {
       name:     'tinaai-web',
       script:   path.join(dir, 'server.js'),
       env_file: path.join(dir, '.env'),
+      env: { PORT: 3000 },
       watch:    false,
     },
   ],
