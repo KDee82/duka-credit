@@ -239,6 +239,30 @@
   }
   .empty-state .big { font-size: 48px; }
   .empty-state p { font-size: 14px; line-height: 1.6; }
+
+  /* Key input rows */
+  .key-row { display: flex; flex-direction: column; gap: 4px; }
+  .key-input-wrap { position: relative; display: flex; align-items: center; }
+  .key-input-wrap input {
+    width: 100%; background: var(--bg); border: 1px solid var(--border);
+    border-radius: 6px; padding: 8px 36px 8px 10px;
+    color: var(--text); font-size: 12px; outline: none;
+    transition: border-color .15s; font-family: monospace;
+  }
+  .key-input-wrap input:focus { border-color: var(--green); }
+  .key-eye {
+    position: absolute; right: 8px; background: none; border: none;
+    color: var(--sub); cursor: pointer; font-size: 14px; padding: 2px;
+  }
+  .key-eye:hover { color: var(--text); }
+  .key-status {
+    display: flex; align-items: center; gap: 5px;
+    font-size: 11px; color: var(--sub);
+  }
+  .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--border); flex-shrink: 0; }
+  .dot.ok  { background: var(--green); }
+  .dot.err { background: var(--danger); }
+  .key-current { font-family: monospace; color: var(--sub); font-size: 11px; }
 </style>
 </head>
 <body>
@@ -255,6 +279,59 @@
   </div>
 
   <div class="sidebar-body">
+
+    <!-- API Keys -->
+    <div class="section">
+      <div class="section-title">🔑 API Keys</div>
+      <div class="section-body">
+
+        <div class="key-row">
+          <label>Admin Token <span style="color:var(--danger);font-size:10px">(from server console)</span></label>
+          <div class="key-input-wrap">
+            <input type="password" id="adminToken" placeholder="Paste token from server log">
+            <button class="key-eye" onclick="toggleEye('adminToken',this)">👁</button>
+          </div>
+        </div>
+
+        <div class="key-row">
+          <div class="key-status">
+            <span class="dot" id="dotGrok"></span>
+            <span>Grok API Key</span>
+            <span class="key-current" id="maskedGrok"></span>
+          </div>
+          <div class="key-input-wrap">
+            <input type="password" id="keyGrok" placeholder="xai-…">
+            <button class="key-eye" onclick="toggleEye('keyGrok',this)">👁</button>
+          </div>
+        </div>
+
+        <div class="key-row">
+          <div class="key-status">
+            <span class="dot" id="dotClaude"></span>
+            <span>Claude API Key</span>
+            <span class="key-current" id="maskedClaude"></span>
+          </div>
+          <div class="key-input-wrap">
+            <input type="password" id="keyClaude" placeholder="sk-ant-…">
+            <button class="key-eye" onclick="toggleEye('keyClaude',this)">👁</button>
+          </div>
+        </div>
+
+        <div class="key-row">
+          <div class="key-status">
+            <span class="dot" id="dotTelegram"></span>
+            <span>Telegram Bot Token</span>
+            <span class="key-current" id="maskedTelegram"></span>
+          </div>
+          <div class="key-input-wrap">
+            <input type="password" id="keyTelegram" placeholder="1234567890:ABC…">
+            <button class="key-eye" onclick="toggleEye('keyTelegram',this)">👁</button>
+          </div>
+        </div>
+
+        <button class="btn btn-green" onclick="saveKeys()">Save Keys</button>
+      </div>
+    </div>
 
     <!-- Profile -->
     <div class="section">
@@ -593,6 +670,63 @@
     if (provider === 'claude') el.textContent = 'Powered by Claude';
   }
 
+  // ── API Keys ─────────────────────────────────────────────────
+  function toggleEye(inputId, btn) {
+    const el = document.getElementById(inputId);
+    if (el.type === 'password') { el.type = 'text';     btn.textContent = '🙈'; }
+    else                        { el.type = 'password'; btn.textContent = '👁';  }
+  }
+
+  async function loadKeyStatus() {
+    try {
+      const res  = await fetch('/api/keys');
+      const data = await res.json();
+      setDot('dotGrok',     data.grok,     'maskedGrok');
+      setDot('dotClaude',   data.claude,   'maskedClaude');
+      setDot('dotTelegram', data.telegram, 'maskedTelegram');
+    } catch { /* server may be starting */ }
+  }
+
+  function setDot(dotId, value, maskedId) {
+    const dot    = document.getElementById(dotId);
+    const masked = document.getElementById(maskedId);
+    if (value) { dot.className = 'dot ok';  masked.textContent = value; }
+    else        { dot.className = 'dot err'; masked.textContent = 'not set'; }
+  }
+
+  async function saveKeys() {
+    const token    = document.getElementById('adminToken').value.trim();
+    const grok     = document.getElementById('keyGrok').value.trim();
+    const claude   = document.getElementById('keyClaude').value.trim();
+    const telegram = document.getElementById('keyTelegram').value.trim();
+
+    if (!token) { showToast('Paste the Admin Token from the server console first'); return; }
+    if (!grok && !claude && !telegram) { showToast('Enter at least one key to save'); return; }
+
+    const body = {};
+    if (grok)     body.grokApiKey    = grok;
+    if (claude)   body.claudeApiKey  = claude;
+    if (telegram) body.telegramToken = telegram;
+
+    try {
+      const res  = await fetch('/api/keys', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify(body),
+      });
+      const data = await res.json();
+      if (!res.ok) { showToast('✗ ' + (data.error || 'Failed'), 3000); return; }
+      showToast('✅ Keys saved and applied live');
+      document.getElementById('keyGrok').value    = '';
+      document.getElementById('keyClaude').value  = '';
+      document.getElementById('keyTelegram').value = '';
+      await loadKeyStatus();
+      await init();
+    } catch (err) {
+      showToast('✗ Network error: ' + err.message, 3000);
+    }
+  }
+
   // ── Provider badge & init ────────────────────────────────────
   async function init() {
     try {
@@ -610,7 +744,7 @@
         badge.className   = 'provider-badge none';
       }
     } catch { /* server starting */ }
-    await refreshSession();
+    await Promise.all([refreshSession(), loadKeyStatus()]);
   }
 
   chatIdInput.addEventListener('change', refreshSession);
